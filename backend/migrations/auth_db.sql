@@ -67,9 +67,12 @@ CREATE TABLE user_roles (
     user_id UUID NOT NULL REFERENCES users_auth(id) ON DELETE CASCADE,
     role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
     tenant_id UUID, -- NULL for global roles, UUID for tenant-specific
-    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    PRIMARY KEY (user_id, role_id, tenant_id)
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Create partial unique index to handle NULL tenant_id
+CREATE UNIQUE INDEX idx_user_roles_global ON user_roles (user_id, role_id) WHERE tenant_id IS NULL;
+CREATE UNIQUE INDEX idx_user_roles_tenant ON user_roles (user_id, role_id, tenant_id) WHERE tenant_id IS NOT NULL;
 
 -- Admin audit logs (moved to admin_db, but keeping here as requested)
 CREATE TABLE admin_audit_logs (
@@ -152,6 +155,6 @@ WHERE r.name = 'user' AND p.name = 'user.read';
 INSERT INTO users_auth (id, email, username, password_hash, status) VALUES
 ('550e8400-e29b-41d4-a716-446655440000', 'admin@example.com', 'admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'active'); -- password: password
 
--- Assign admin role
-INSERT INTO user_roles (user_id, role_id)
-SELECT '550e8400-e29b-41d4-a716-446655440000', id FROM roles WHERE name = 'admin';
+-- Assign admin role (with NULL tenant_id for global admin)
+INSERT INTO user_roles (user_id, role_id, tenant_id)
+SELECT '550e8400-e29b-41d4-a716-446655440000', id, NULL FROM roles WHERE name = 'admin';
