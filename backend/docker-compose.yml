@@ -80,6 +80,7 @@ services:
       AUTH_SERVICE_URL: http://auth-service:3001
       USER_SERVICE_URL: http://user-service:3002
       ADMIN_SERVICE_URL: http://admin-service:3003
+      CATALOG_SERVICE_URL: http://catalog-service:3003
       JWT_SECRET: shared-jwt-secret-key-12345
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
       PROMETHEUS_PORT: 9090
@@ -87,6 +88,7 @@ services:
       - auth-service
       - user-service
       - admin-service
+      - catalog-service
       - prometheus
       - jaeger
     networks:
@@ -144,6 +146,29 @@ services:
       JWT_SECRET: shared-jwt-secret-key-12345
     depends_on:
       - postgres
+    networks:
+      - backend
+
+  catalog-service:
+    build: ./catalog-service
+    ports:
+      - "3014:3003"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/catalog_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: catalog_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      PROMETHEUS_PORT: 9464
+    depends_on:
+      - postgres
+      - rabbitmq
+      - prometheus
+      - jaeger
     networks:
       - backend
 

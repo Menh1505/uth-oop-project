@@ -20,6 +20,14 @@ export class GatewayService {
     // Admin service routes
     { pattern: '/api/admin/**', service: 'admin', requireAuth: true },
     { pattern: '/api/admin/status', service: 'admin', requireAuth: false },
+
+    // Catalog service routes
+    { pattern: '/api/catalog/products', service: 'catalog', requireAuth: false },
+    { pattern: '/api/catalog/products/**', service: 'catalog', requireAuth: false },
+    { pattern: '/api/catalog/categories', service: 'catalog', requireAuth: false },
+    { pattern: '/api/catalog/categories/**', service: 'catalog', requireAuth: false },
+    { pattern: '/api/catalog/inventory/**', service: 'catalog', requireAuth: false },
+    { pattern: '/api/catalog/health', service: 'catalog', requireAuth: false },
   ];
 
   static async routeRequest(req: GatewayRequest): Promise<GatewayResponse> {
@@ -129,6 +137,8 @@ export class GatewayService {
         return config.services.user.url;
       case 'admin':
         return config.services.admin.url;
+      case 'catalog':
+        return config.services.catalog.url;
       default:
         return null;
     }
@@ -189,7 +199,7 @@ export class GatewayService {
   }
 
   static async healthCheck(): Promise<HealthCheck[]> {
-    const services = ['auth', 'user', 'admin'];
+    const services = ['auth', 'user', 'admin', 'catalog'];
     const healthChecks = await Promise.all(
       services.map(service => this.checkServiceHealth(service))
     );

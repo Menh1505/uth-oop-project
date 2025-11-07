@@ -21,6 +21,10 @@ export const config = {
       url: process.env.ADMIN_SERVICE_URL || 'http://admin-service:3003',
       timeout: 5000,
     },
+    catalog: {
+      url: process.env.CATALOG_SERVICE_URL || 'http://catalog-service:3003',
+      timeout: 5000,
+    },
   },
 
   // Rate Limiting
