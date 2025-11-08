@@ -1,0 +1,183 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
+      - ./migrations:/migrations:ro
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - backend
+
+  # Observability Stack
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - backend
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    networks:
+      - backend
+
+  gateway-service:
+    build: ./gateway-service
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3002
+      ADMIN_SERVICE_URL: http://admin-service:3003
+      CATALOG_SERVICE_URL: http://catalog-service:3003
+      JWT_SECRET: shared-jwt-secret-key-12345
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      PROMETHEUS_PORT: 9090
+    depends_on:
+      - auth-service
+      - user-service
+      - admin-service
+      - catalog-service
+      - prometheus
+      - jaeger
+    networks:
+      - backend
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "3011:3001"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/auth_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: auth_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - backend
+
+  user-service:
+    build: ./user-service
+    ports:
+      - "3012:3002"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/user_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: user_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - backend
+
+  admin-service:
+    build: ./admin-service
+    ports:
+      - "3013:3003"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/admin_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: admin_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  catalog-service:
+    build: ./catalog-service
+    ports:
+      - "3014:3003"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/catalog_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: catalog_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      PROMETHEUS_PORT: 9464
+    depends_on:
+      - postgres
+      - rabbitmq
+      - prometheus
+      - jaeger
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  prometheus_data:
+  grafana_data:

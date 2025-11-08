@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+@import "tailwindcss";
+
+/* Define your “variables” (tokens) & animations in v4 using @theme */
+@theme {
+  --font-sans: Poppins, ui-sans-serif, system-ui, sans-serif; /* => class: font-sans */
+  --color-brand: #4f46e5;                                     /* => class: text-brand, bg-brand, etc. */
+  --radius-xl2: 1.25rem;                                      /* => class: rounded-xl2 */
+
+  /* Animations */
+  --animate-fade-in: fade-in 300ms ease-out both;              /* => class: animate-fade-in */
+}
+
+/* Keyframes live as normal CSS (v4 will pick them up) */
+@keyframes fade-in {
+  from { opacity: 0 }
+  to   { opacity: 1 }
+}
+
+/* Example usage via @apply */
+body {
+  @apply font-sans antialiased text-gray-900 bg-white;
+}
+.container-app {
+  @apply max-w-5xl mx-auto px-4 md:px-6 lg:px-8;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl2 px-4 py-2 text-sm font-medium transition shadow-sm;
+}
+.btn-primary {
+  @apply bg-gray-900 text-white hover:bg-black;
+}
+.btn-ghost {
+  @apply bg-transparent hover:bg-gray-100;
+}
+.btn-danger {
+  @apply bg-red-600 text-white hover:bg-red-700;
+}
+
+.card {
+  @apply rounded-2xl bg-white/90 backdrop-blur border border-gray-200 shadow-md p-5;
+}
+.card-title {
+  @apply text-lg font-semibold mb-3;
+}
+
+.input {
+  @apply w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900/40;
+}
+.select {
+  @apply w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900/40;
+}
+
+.grid-2 {
+  @apply grid gap-5 md:grid-cols-2;
+}
+.grid-form {
+  @apply grid gap-3 sm:grid-cols-2;
+}
+
+.table {
+  @apply w-full text-sm;
+}
+.table th {
+  @apply text-left font-semibold text-gray-600 pb-2;
+}
+.table td {
+  @apply py-2 border-t border-gray-100;
+}
+
+.steps {
+  @apply flex gap-3;
+}
+.step {
+  @apply flex items-center gap-2 rounded-full border px-3 py-1 text-xs;
+}
+.step-done {
+  @apply bg-gray-900 text-white border-gray-900;
+}
+.step-pending {
+  @apply bg-gray-50 text-gray-700 border-gray-200;
+}
+
+.nav-tabs {
+  @apply flex flex-wrap gap-2;
+}
+.tab {
+  @apply rounded-xl border border-gray-200 px-3 py-1.5 text-sm hover:bg-gray-50;
+}
+.tab-active {
+  @apply bg-gray-900 text-white border-gray-900;
+}
