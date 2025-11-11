@@ -45,6 +45,7 @@ CREATE TABLE roles (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+<<<<<<< HEAD
 -- Permissions
 CREATE TABLE permissions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -54,6 +55,7 @@ CREATE TABLE permissions (
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
 
 -- Role-Permission relationships
 CREATE TABLE role_permissions (
@@ -67,7 +69,8 @@ CREATE TABLE user_roles (
     user_id UUID NOT NULL REFERENCES users_auth(id) ON DELETE CASCADE,
     role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
     tenant_id UUID, -- NULL for global roles, UUID for tenant-specific
-    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (user_id, role_id)
 );
 
 -- Create partial unique index to handle NULL tenant_id
@@ -131,6 +134,7 @@ CREATE INDEX idx_token_blacklist_user_id ON token_blacklist(user_id);
 CREATE INDEX idx_token_blacklist_expires_at ON token_blacklist(expires_at);
 
 -- Default data
+<<<<<<< HEAD
 INSERT INTO roles (name, description) VALUES
 ('admin', 'Full system administrator'),
 ('user', 'Regular user'),
@@ -158,3 +162,59 @@ INSERT INTO users_auth (id, email, username, password_hash, status) VALUES
 -- Assign admin role (with NULL tenant_id for global admin)
 INSERT INTO user_roles (user_id, role_id, tenant_id)
 SELECT '550e8400-e29b-41d4-a716-446655440000', id, NULL FROM roles WHERE name = 'admin';
+=======
+-- Tạo các vai trò (roles)
+INSERT INTO roles (id, name, description) VALUES
+('11111111-1111-1111-1111-111111111111', 'admin', 'Quản trị viên hệ thống'),
+('22222222-2222-2222-2222-222222222222', 'user', 'Người dùng thường'),
+('33333333-3333-3333-3333-333333333333', 'moderator', 'Kiểm duyệt viên')
+ON CONFLICT (name) DO NOTHING;
+
+-- Tạo các quyền (permissions)
+INSERT INTO permissions (id, name, resource, action, description) VALUES
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1', 'user.read', 'user', 'read', 'Xem thông tin người dùng'),
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2', 'user.write', 'user', 'write', 'Sửa thông tin người dùng'),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1', 'admin.read', 'admin', 'read', 'Truy cập trang quản trị'),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2', 'admin.write', 'admin', 'write', 'Chỉnh sửa cấu hình hệ thống')
+ON CONFLICT (name) DO NOTHING;
+
+-- Gán quyền cho vai trò admin
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id 
+FROM roles r, permissions p
+WHERE r.name = 'admin' AND p.name IN ('user.read', 'user.write', 'admin.read', 'admin.write')
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Gán quyền cho vai trò user
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id 
+FROM roles r, permissions p
+WHERE r.name = 'user' AND p.name = 'user.read'
+ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- Tạo tài khoản admin mặc định
+-- Email: admin@example.com
+-- Mật khẩu: Admin@123
+INSERT INTO users_auth (id, email, username, password_hash, status) 
+VALUES (
+  '00000000-0000-0000-0000-000000000001', 
+  'admin@example.com', 
+  'admin', 
+  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 
+  'active'
+) 
+ON CONFLICT (email) DO NOTHING;
+
+<<<<<<< HEAD:fe-be-foot/migrations/auth_db.sql
+-- Gán vai trò admin cho tài khoản admin
+INSERT INTO user_roles (user_id, role_id)
+SELECT '00000000-0000-0000-0000-000000000001', id 
+FROM roles 
+WHERE name = 'admin'
+ON CONFLICT (user_id, role_id) DO NOTHING;
+=======
+-- Assign admin role (with NULL tenant_id for global admin)
+INSERT INTO user_roles (user_id, role_id, tenant_id)
+SELECT '550e8400-e29b-41d4-a716-446655440000', id, NULL FROM roles WHERE name = 'admin';
+>>>>>>> origin/main:backend/migrations/auth_db.sql
+>>>>>>> 898a3e8 (feat: database)
