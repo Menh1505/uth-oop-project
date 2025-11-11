@@ -1,6 +1,5 @@
 export const rabbitMQConfig = {
-
   url: process.env.RABBITMQ_URL || 'amqp://admin:admin@rabbitmq:5672',
-  exchange: 'auth_exchange',
+  exchange: 'user_exchange',
   exchangeType: 'direct',
 };
