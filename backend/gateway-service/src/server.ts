@@ -8,7 +8,7 @@ import { config } from './config/config';
 import { MetricsService } from './services/MetricsService';
 import gatewayRoutes from './routes/gatewayRoutes';
 import { errorHandler } from './middleware/errorHandler';
-
+import { rateLimitMiddleware } from "./middleware/rateLimitMiddleware";
 const app = express();
 
 // Security middleware
@@ -42,7 +42,7 @@ app.use((req, res, next) => {
 });
 
 // Routes
-app.use('/', gatewayRoutes);
+app.use("/api", rateLimitMiddleware);
 
 // Default route
 app.get('/', (req, res) => {
