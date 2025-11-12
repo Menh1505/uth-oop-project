@@ -80,7 +80,7 @@ services:
   #     AUTH_SERVICE_URL: http://auth-service:3001
   #     USER_SERVICE_URL: http://user-service:3002
   #     ADMIN_SERVICE_URL: http://admin-service:3003
-  #     CATALOG_SERVICE_URL: http://catalog-service:3003
+  #     CATALOG_SERVICE_URL: http://catalog-service:3004
   #     JWT_SECRET: shared-jwt-secret-key-12345
   #     JAEGER_ENDPOINT: http://jaeger:14268/api/traces
   #     PROMETHEUS_PORT: 9090
@@ -88,11 +88,24 @@ services:
   #     - auth-service
   #     - user-service
   #     - admin-service
-  #     - catalog-service
+  #     # - catalog-service
   #     - prometheus
   #     - jaeger
   #   networks:
   #     - backend
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - auth-service
+      - user-service
+      - admin-service
+    networks:
+      - backend
 
   auth-service:
     build: ./auth-service

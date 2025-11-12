@@ -12,7 +12,7 @@ router.post('/logout', AuthController.logout);
 
 // Verify token
 router.get('/verify', AuthController.verify);
-
+router.get("/health", AuthController.health);
 // Simple status endpoint for testing
 router.get('/status', (req, res) => {
   res.json({

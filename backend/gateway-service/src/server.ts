@@ -27,6 +27,7 @@ MetricsService.initialize();
 
 // Request logging middleware
 app.use((req, res, next) => {
+  
   const startTime = Date.now();
   
   res.on('finish', () => {
@@ -41,8 +42,22 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use((req, res, next) => {
+  console.log("================================")
+  console.log(`➡️  ${req.method} ${req.originalUrl}`);
+
+  if (Object.keys(req.query).length) {
+    console.log(" 🔹 Query:", req.query);
+  }
+
+  if (Object.keys(req.body).length) {
+    console.log(" 🔸 Body:", req.body);
+  }
+  console.log("================================")
+  next();
+});
 // Routes
-app.use("/api", rateLimitMiddleware);
+app.use("/", rateLimitMiddleware , gatewayRoutes);
 
 // Default route
 app.get('/', (req, res) => {
