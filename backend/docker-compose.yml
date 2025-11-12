@@ -185,6 +185,25 @@ services:
   #   networks:
   #     - backend
 
+  order-service:
+    build: ./order-service
+    ports:
+      - "3014:3004"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: order_db
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - backend
+    restart: unless-stopped
+  
+
 networks:
   backend:
     driver: bridge
