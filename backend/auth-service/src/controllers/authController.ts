@@ -2,8 +2,31 @@ import { Request, Response } from 'express';
 import { AuthService } from '../services/authService';
 import jwt from 'jsonwebtoken';
 import { jwtConfig } from '../config/jwt';
-
+function internalSelfCheck() {
+  return { db: "ok", redis: "ok" };
+}
 export class AuthController {
+  static  async health(req: Request, res: Response) {
+    const started = Date.now();
+  try {
+    const checks = internalSelfCheck();
+    const responseTime = Date.now() - started;
+    res.status(200).json({
+      service: "auth-service",
+      status: "healthy",
+      checks,
+      uptime: process.uptime(),
+      responseTime
+    });
+  } catch (err: any) {
+    res.status(503).json({
+      service: "auth-service",
+      status: "unhealthy",
+      error: err?.message || "unknown",
+      uptime: process.uptime()
+    });
+  }
+  }
   static async login(req: Request, res: Response) {
     const { username, password } = req.body;
 

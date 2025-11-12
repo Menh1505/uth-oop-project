@@ -3,3 +3,5 @@ export const rabbitMQConfig = {
   exchange: 'user_exchange',
   exchangeType: 'direct',
 };
+
+console.log('[RabbitMQ] URL =', rabbitMQConfig.url);
