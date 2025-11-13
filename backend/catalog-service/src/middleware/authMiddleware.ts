@@ -22,7 +22,7 @@ export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: N
     const decoded = jwt.verify(token, JWT_CONFIG.secret) as JWTPayload;
     req.user = decoded;
     
-    next();
+    return next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       return res.status(401).json({ 
@@ -38,7 +38,7 @@ export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: N
       });
     }
     
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: 'Internal server error during authentication.',
       code: 'AUTH_ERROR' 
     });
@@ -63,6 +63,6 @@ export const requireRole = (roles: string[]) => {
       });
     }
 
-    next();
+    return next();
   };
 };

@@ -330,7 +330,7 @@ export class CatalogService {
       
       metrics.catalogOperations.labels('delete_category', 'success').inc();
       
-      return result.rowCount > 0;
+      return (result.rowCount ?? 0) > 0;
     } catch (error) {
       metrics.catalogOperations.labels('delete_category', 'error').inc();
       throw error;
@@ -457,7 +457,7 @@ export class CatalogService {
           RETURNING *
         `, [reservation.quantity, reservation.productId]);
         
-        if (result.rowCount === 0) {
+        if ((result.rowCount ?? 0) === 0) {
           await client.query('ROLLBACK');
           return false;
         }
