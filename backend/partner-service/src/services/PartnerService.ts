@@ -51,7 +51,7 @@ export class PartnerService {
 
       await client.query('COMMIT');
       return result.rows[0];
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
       throw new Error(`Failed to create partner: ${error.message}`);
     } finally {
@@ -71,7 +71,7 @@ export class PartnerService {
 
       const result = await this.pool.query(query, params);
       return result.rows[0] || null;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get partner: ${error.message}`);
     }
   }
@@ -86,7 +86,7 @@ export class PartnerService {
         LEFT JOIN restaurants r ON p.id = r.partner_id
         WHERE p.user_id = $1
       `;
-      const params = [userId];
+      const params: any[] = [userId];
       let paramCount = 1;
 
       // Apply filters
@@ -124,7 +124,7 @@ export class PartnerService {
 
       const result = await this.pool.query(query, params);
       return result.rows;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get partners: ${error.message}`);
     }
   }
@@ -132,8 +132,8 @@ export class PartnerService {
   async updatePartner(partnerId: string, userId: string, updateData: UpdatePartnerRequest): Promise<Partner | null> {
     const client = await this.pool.connect();
     try {
-      const setClauses = [];
-      const params = [partnerId, userId];
+      const setClauses: string[] = [];
+      const params: any[] = [partnerId, userId];
       let paramCount = 2;
 
       Object.entries(updateData).forEach(([key, value]) => {
@@ -157,7 +157,7 @@ export class PartnerService {
 
       const result = await client.query(query, params);
       return result.rows[0] || null;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to update partner: ${error.message}`);
     } finally {
       client.release();
@@ -209,7 +209,7 @@ export class PartnerService {
 
       await client.query('COMMIT');
       return result.rows[0];
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
       throw new Error(`Failed to create restaurant: ${error.message}`);
     } finally {
@@ -234,7 +234,7 @@ export class PartnerService {
 
       const result = await this.pool.query(query, params);
       return result.rows[0] || null;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get restaurant: ${error.message}`);
     }
   }
@@ -247,7 +247,7 @@ export class PartnerService {
         JOIN partners p ON r.partner_id = p.id
         WHERE r.partner_id = $1 AND p.user_id = $2
       `;
-      const params = [partnerId, userId];
+      const params: any[] = [partnerId, userId];
       let paramCount = 2;
 
       // Apply filters
@@ -285,7 +285,7 @@ export class PartnerService {
 
       const result = await this.pool.query(query, params);
       return result.rows;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get restaurants: ${error.message}`);
     }
   }
@@ -298,7 +298,7 @@ export class PartnerService {
         JOIN partners p ON r.partner_id = p.id
         WHERE r.status = $1 AND p.status = $2
       `;
-      const params = [RestaurantStatus.OPEN, PartnerStatus.ACTIVE];
+      const params: any[] = [RestaurantStatus.OPEN, PartnerStatus.ACTIVE];
       let paramCount = 2;
 
       // Location-based search
@@ -349,7 +349,7 @@ export class PartnerService {
 
       const result = await this.pool.query(query, params);
       return result.rows;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to search restaurants: ${error.message}`);
     }
   }
@@ -357,8 +357,8 @@ export class PartnerService {
   async updateRestaurant(restaurantId: string, userId: string, updateData: UpdateRestaurantRequest): Promise<Restaurant | null> {
     const client = await this.pool.connect();
     try {
-      const setClauses = [];
-      const params = [restaurantId, userId];
+      const setClauses: string[] = [];
+      const params: any[] = [restaurantId, userId];
       let paramCount = 2;
 
       Object.entries(updateData).forEach(([key, value]) => {
@@ -388,7 +388,7 @@ export class PartnerService {
 
       const result = await client.query(query, params);
       return result.rows[0] || null;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to update restaurant: ${error.message}`);
     } finally {
       client.release();
@@ -443,7 +443,7 @@ export class PartnerService {
 
       await client.query('COMMIT');
       return result.rows[0];
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
       throw new Error(`Failed to create menu item: ${error.message}`);
     } finally {
@@ -459,7 +459,7 @@ export class PartnerService {
         JOIN restaurants r ON m.restaurant_id = r.id
         WHERE m.restaurant_id = $1
       `;
-      const params = [restaurantId];
+      const params: any[] = [restaurantId];
       let paramCount = 1;
 
       // Apply filters
@@ -503,7 +503,7 @@ export class PartnerService {
 
       const result = await this.pool.query(query, params);
       return result.rows;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get menu items: ${error.message}`);
     }
   }
@@ -511,8 +511,8 @@ export class PartnerService {
   async updateMenuItem(itemId: string, userId: string, updateData: UpdateMenuItemRequest): Promise<MenuItem | null> {
     const client = await this.pool.connect();
     try {
-      const setClauses = [];
-      const params = [itemId, userId];
+      const setClauses: string[] = [];
+      const params: any[] = [itemId, userId];
       let paramCount = 2;
 
       Object.entries(updateData).forEach(([key, value]) => {
@@ -543,7 +543,7 @@ export class PartnerService {
 
       const result = await client.query(query, params);
       return result.rows[0] || null;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to update menu item: ${error.message}`);
     } finally {
       client.release();
@@ -593,7 +593,7 @@ export class PartnerService {
 
       await client.query('COMMIT');
       return result.rows[0];
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
       throw new Error(`Failed to create promotion: ${error.message}`);
     } finally {
@@ -610,7 +610,7 @@ export class PartnerService {
         JOIN partners p ON r.partner_id = p.id
         WHERE pr.restaurant_id = $1 AND p.user_id = $2
       `;
-      const params = [restaurantId, userId];
+      const params: any[] = [restaurantId, userId];
       let paramCount = 2;
 
       // Apply filters
@@ -640,7 +640,7 @@ export class PartnerService {
 
       const result = await this.pool.query(query, params);
       return result.rows;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get promotions: ${error.message}`);
     }
   }
@@ -680,7 +680,7 @@ export class PartnerService {
 
       await client.query('COMMIT');
       return result.rows[0];
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
       throw new Error(`Failed to create inventory: ${error.message}`);
     } finally {
@@ -698,7 +698,7 @@ export class PartnerService {
         LEFT JOIN menu_items m ON i.menu_item_id = m.id
         WHERE i.restaurant_id = $1 AND p.user_id = $2
       `;
-      const params = [restaurantId, userId];
+      const params: any[] = [restaurantId, userId];
       let paramCount = 2;
 
       // Apply filters
@@ -732,7 +732,7 @@ export class PartnerService {
 
       const result = await this.pool.query(query, params);
       return result.rows;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get inventory: ${error.message}`);
     }
   }
@@ -785,7 +785,7 @@ export class PartnerService {
         average_commission_rate: parseFloat(stats.average_commission_rate),
         top_performing_partners: topPartnersResult.rows
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get partner analytics: ${error.message}`);
     }
   }
@@ -852,7 +852,7 @@ export class PartnerService {
         restaurants_by_type: restaurants_by_type as any,
         restaurants_by_city
       };
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to get restaurant analytics: ${error.message}`);
     }
   }
@@ -878,7 +878,7 @@ export class PartnerService {
       `, [promotionId, userId, status]);
 
       return result.rows.length > 0;
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Failed to update promotion status: ${error.message}`);
     }
   }

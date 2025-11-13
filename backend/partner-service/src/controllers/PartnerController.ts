@@ -38,13 +38,13 @@ export class PartnerController {
 
       const partner = await this.partnerService.createPartner(userId, partnerData);
       
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: partner,
         message: 'Partner created successfully. Awaiting approval.'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to create partner',
         message: error.message
@@ -66,12 +66,12 @@ export class PartnerController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: partner
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to get partner',
         message: error.message
@@ -121,13 +121,13 @@ export class PartnerController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: partner,
         message: 'Partner updated successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update partner',
         message: error.message
@@ -155,13 +155,13 @@ export class PartnerController {
 
       const restaurant = await this.partnerService.createRestaurant(partnerId, userId, restaurantData);
       
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: restaurant,
         message: 'Restaurant created successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to create restaurant',
         message: error.message
@@ -183,12 +183,12 @@ export class PartnerController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: restaurant
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to get restaurant',
         message: error.message
@@ -272,13 +272,13 @@ export class PartnerController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: restaurant,
         message: 'Restaurant updated successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update restaurant',
         message: error.message
@@ -308,13 +308,13 @@ export class PartnerController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: restaurant,
         message: `Restaurant status updated to ${status}`
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update restaurant status',
         message: error.message
@@ -340,13 +340,13 @@ export class PartnerController {
 
       const menuItem = await this.partnerService.createMenuItem(restaurantId, userId, itemData);
       
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: menuItem,
         message: 'Menu item created successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to create menu item',
         message: error.message
@@ -399,13 +399,13 @@ export class PartnerController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: menuItem,
         message: 'Menu item updated successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update menu item',
         message: error.message
@@ -435,13 +435,13 @@ export class PartnerController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: menuItem,
         message: `Menu item status updated to ${status}`
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update menu item status',
         message: error.message
@@ -468,13 +468,13 @@ export class PartnerController {
 
       const promotion = await this.partnerService.createPromotion(restaurantId, userId, promotionData);
       
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: promotion,
         message: 'Promotion created successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to create promotion',
         message: error.message
@@ -533,12 +533,12 @@ export class PartnerController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: `Promotion status updated to ${status}`
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update promotion status',
         message: error.message
@@ -567,13 +567,13 @@ export class PartnerController {
 
       const inventory = await this.partnerService.createInventory(restaurantId, userId, inventoryData);
       
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: inventory,
         message: 'Inventory item created successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to create inventory item',
         message: error.message
