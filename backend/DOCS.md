@@ -34,6 +34,9 @@ backend/
 └── 📁 nginx/               # Gateway configuration
 ```
 
+
+
+
 ## 🎯 Hướng dẫn theo mục đích
 
 ### 👨‍💻 Dành cho Developer
