@@ -101,7 +101,6 @@ recommendation-service/logs/
 workout-service/logs/
 nutrition-service/logs/
 catalog-service/logs/
-gateway-service/logs/
 
 # Service temporary files
 */temp/

@@ -122,18 +122,18 @@ wait_for_services() {
     done
     print_success "RabbitMQ is ready"
     
-    # Wait for API Gateway
-    print_status "Waiting for API Gateway..."
+    # Wait for Nginx Gateway
+    print_status "Waiting for Nginx Gateway..."
     count=0
-    while ! curl -s http://localhost:3000 >/dev/null 2>&1; do
+    while ! curl -s http://localhost:3000/health >/dev/null 2>&1; do
         sleep 2
         count=$((count + 1))
         if [ $count -gt 30 ]; then
-            print_error "API Gateway failed to start within 60 seconds"
+            print_error "Nginx Gateway failed to start within 60 seconds"
             exit 1
         fi
     done
-    print_success "API Gateway is ready"
+    print_success "Nginx Gateway is ready"
 }
 
 # Display service information
@@ -142,21 +142,33 @@ show_services_info() {
     print_success "🎉 All services are up and running!"
     echo
     echo "📋 Service Information:"
-    echo "├── API Gateway:      http://localhost:3000"
-    echo "├── Auth Service:     http://localhost:3011"  
-    echo "├── User Service:     http://localhost:3012"
-    echo "├── Admin Service:    http://localhost:3013"
-    echo "├── Workout Service:  http://localhost:3015"
-    echo "├── Nutrition Service: http://localhost:3016"
-    echo "├── Order Service:    http://localhost:3017"
-    echo "├── RabbitMQ UI:      http://localhost:15672 (admin/admin)"
-    echo "└── PostgreSQL:       localhost:5432 (postgres/postgres_password)"
+    echo "├── 🌐 Nginx Gateway:        http://localhost:3000"
+    echo "├── 🔐 Auth Service:         http://localhost:3011"  
+    echo "├── 👤 User Service:         http://localhost:3012"
+    echo "├── 👨‍💼 Admin Service:        http://localhost:3013"
+    echo "├── 💪 Workout Service:      http://localhost:3015"
+    echo "├── 🥗 Nutrition Service:    http://localhost:3016"
+    echo "├── 📦 Order Service:        http://localhost:3017"
+    echo "├── 💳 Payment Service:      http://localhost:3018"
+    echo "├── 🏪 Partner Service:      http://localhost:3019"
+    echo "├── 🚚 Delivery Service:     http://localhost:3020"
+    echo "├── 📧 Notification Service: http://localhost:3021"
+    echo "├── 🤖 Recommendation Service: http://localhost:3022"
+    echo "├── 🐰 RabbitMQ UI:          http://localhost:15672 (admin/admin)"
+    echo "└── 🗄️  PostgreSQL:          localhost:5432 (postgres/postgres_password)"
     echo
-    echo "🧪 Test APIs:"
+    echo "🧪 Test APIs via Nginx Gateway:"
+    echo "curl http://localhost:3000/health"
     echo "curl http://localhost:3000/api/auth/"
-    echo "curl http://localhost:3015/api/workouts/health"
-    echo "curl http://localhost:3016/api/nutrition/health"
-    echo "curl http://localhost:3017/api/orders/health"
+    echo "curl http://localhost:3000/api/users/"
+    echo "curl http://localhost:3000/api/workouts/"
+    echo "curl http://localhost:3000/api/nutrition/"
+    echo "curl http://localhost:3000/api/orders/"
+    echo "curl http://localhost:3000/api/payments/"
+    echo "curl http://localhost:3000/api/partners/"
+    echo "curl http://localhost:3000/api/deliveries/"
+    echo "curl http://localhost:3000/api/notifications/"
+    echo "curl http://localhost:3000/api/recommendations/"
     echo
     echo "📊 Monitor logs:"
     echo "docker compose logs -f"
