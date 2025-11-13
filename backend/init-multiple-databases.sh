@@ -10,6 +10,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
   CREATE DATABASE nutrition_db;
   CREATE DATABASE order_db;
   CREATE DATABASE payment_db;
+  CREATE DATABASE partner_db;
 
   -- Grant permissions
   GRANT ALL PRIVILEGES ON DATABASE auth_db TO $POSTGRES_USER;
@@ -19,6 +20,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
   GRANT ALL PRIVILEGES ON DATABASE nutrition_db TO $POSTGRES_USER;
   GRANT ALL PRIVILEGES ON DATABASE order_db TO $POSTGRES_USER;
   GRANT ALL PRIVILEGES ON DATABASE payment_db TO $POSTGRES_USER;
+  GRANT ALL PRIVILEGES ON DATABASE partner_db TO $POSTGRES_USER;
 EOSQL
 
 # Run migrations for each database
@@ -42,5 +44,8 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "order_db" < /migra
 
 echo "Running payment_db migrations..."
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "payment_db" < /migrations/payment_db.sql
+
+echo "Running partner_db migrations..."
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "partner_db" < /migrations/partner_db.sql
 
 echo "Database initialization completed!"

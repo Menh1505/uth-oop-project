@@ -267,6 +267,24 @@ services:
     networks:
       - backend
 
+  partner-service:
+    build: ./partner-service
+    ports:
+      - "3019:3004"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/partner_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: partner_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      NODE_ENV: production
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
 networks:
   backend:
     driver: bridge
