@@ -198,7 +198,7 @@ export class NutritionService {
         [id, userId]
       );
       
-      return result.rowCount > 0;
+      return (result.rowCount ?? 0) > 0;
     } catch (error) {
       throw error;
     }
@@ -355,7 +355,7 @@ export class NutritionService {
         [id, userId]
       );
       
-      return result.rowCount > 0;
+      return (result.rowCount ?? 0) > 0;
     } catch (error) {
       throw error;
     }

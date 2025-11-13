@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET } from '../config/jwt';
+import { JWT_CONFIG } from '../config/jwt';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -36,14 +36,14 @@ export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: N
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const decoded = jwt.verify(token, JWT_CONFIG.secret) as JWTPayload;
     
     req.user = {
       userId: decoded.userId,
       email: decoded.email
     };
 
-    next();
+    return next();
   } catch (error: any) {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({

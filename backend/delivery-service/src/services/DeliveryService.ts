@@ -1080,7 +1080,8 @@ export class DeliveryService {
   }
 
   private getTrackingEventTypeFromStatus(status: DeliveryStatus): TrackingEventType {
-    const mapping = {
+    // Use a properly typed mapping to avoid TS7053 when indexing by DeliveryStatus.
+    const mapping: Partial<Record<DeliveryStatus, TrackingEventType>> = {
       [DeliveryStatus.ASSIGNED]: TrackingEventType.DRIVER_ASSIGNED,
       [DeliveryStatus.PICKED_UP]: TrackingEventType.ORDER_PICKED_UP,
       [DeliveryStatus.IN_TRANSIT]: TrackingEventType.EN_ROUTE_TO_CUSTOMER,
@@ -1090,7 +1091,7 @@ export class DeliveryService {
       [DeliveryStatus.RETURNED]: TrackingEventType.RETURNED
     };
 
-    return mapping[status] || TrackingEventType.ORDER_PLACED;
+    return mapping[status] ?? TrackingEventType.ORDER_PLACED;
   }
 
   private async updateDriverStats(driverId: string, delivery: Delivery): Promise<void> {

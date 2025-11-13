@@ -187,23 +187,38 @@ Content-Type: application/json
 
 ## 🔧 Configuration
 
-### Environment Variables
+### Environment Variables Setup
+
+1. **Copy the example environment file:**
 ```bash
-# Database
-DATABASE_URL=postgresql://user:pass@host:5432/nutrition_db
-DB_HOST=localhost
-DB_USER=postgres
-DB_PASSWORD=password
-DB_NAME=nutrition_db
-DB_PORT=5432
-
-# Authentication
-JWT_SECRET=your-secret-key
-
-# Server
-PORT=3003
-NODE_ENV=production
+cp .env.example .env
 ```
+
+2. **Configure your environment variables in `.env`:**
+```bash
+# Database Configuration
+DATABASE_URL=postgresql://postgres:password@localhost:5432/nutrition_db
+
+# Server Configuration
+PORT=3003
+NODE_ENV=development
+
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+
+# JWT Configuration (REQUIRED)
+JWT_SECRET=your-super-secret-jwt-key-here
+
+# Additional Security
+API_RATE_LIMIT_WINDOW_MS=900000
+API_RATE_LIMIT_MAX_REQUESTS=100
+```
+
+**⚠️ Important Notes:**
+- `DATABASE_URL` and `JWT_SECRET` are **required** environment variables
+- The service will not start without these variables properly configured
+- Never commit your actual `.env` file to version control
+- Use strong, unique secrets for production environments
 
 ### Docker Configuration
 ```yaml
