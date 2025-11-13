@@ -70,30 +70,6 @@ services:
   #   networks:
   #     - backend
 
-  # gateway-service:
-  #   build: ./gateway-service
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     PORT: 3000
-  #     NODE_ENV: production
-  #     AUTH_SERVICE_URL: http://auth-service:3001
-  #     USER_SERVICE_URL: http://user-service:3002
-  #     ADMIN_SERVICE_URL: http://admin-service:3003
-  #     CATALOG_SERVICE_URL: http://catalog-service:3004
-  #     JWT_SECRET: shared-jwt-secret-key-12345
-  #     JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-  #     PROMETHEUS_PORT: 9090
-  #   depends_on:
-  #     - auth-service
-  #     - user-service
-  #     - admin-service
-  #     # - catalog-service
-  #     - prometheus
-  #     - jaeger
-  #   networks:
-  #     - backend
-
   nginx:
     image: nginx:alpine
     ports:
@@ -104,8 +80,17 @@ services:
       - auth-service
       - user-service
       - admin-service
+      - workout-service
+      - nutrition-service
+      - order-service
+      - payment-service
+      - partner-service
+      - delivery-service
+      - notification-service
+      - recommendation-service
     networks:
       - backend
+    restart: unless-stopped
 
   auth-service:
     build: ./auth-service
@@ -319,6 +304,43 @@ services:
       - order-service
       - partner-service
       - payment-service
+    networks:
+      - backend
+
+  notification-service:
+    build: ./notification-service
+    ports:
+      - "3021:3010"
+    environment:
+      NODE_ENV: production
+      PORT: 3010
+      JWT_SECRET: shared-jwt-secret-key-12345
+      ENABLE_EMAIL: true
+      ENABLE_SMS: true
+      ENABLE_PUSH: true
+      MOCK_PROVIDER_LOG_FILE: ./notifications.log
+    networks:
+      - backend
+
+  recommendation-service:
+    build: ./recommendation-service
+    ports:
+      - "3022:3011"
+    environment:
+      NODE_ENV: production
+      PORT: 3011
+      OPENAI_API_KEY: your_openai_api_key_here
+      OPENAI_MODEL: gpt-3.5-turbo
+      OPENAI_MAX_TOKENS: 500
+      OPENAI_TEMPERATURE: 0.7
+      ENABLE_AI_RECOMMENDATIONS: true
+      ENABLE_FALLBACK_RECOMMENDATIONS: true
+      CACHE_RECOMMENDATIONS: true
+      RECOMMENDATION_CACHE_TTL: 3600
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 100
+      LOG_LEVEL: info
     networks:
       - backend
 
