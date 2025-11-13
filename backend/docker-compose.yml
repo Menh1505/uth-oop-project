@@ -185,6 +185,23 @@ services:
   #   networks:
   #     - backend
 
+  workout-service:
+    build: ./workout-service
+    ports:
+      - "3015:3004"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/workout_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: workout_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
 networks:
   backend:
     driver: bridge
