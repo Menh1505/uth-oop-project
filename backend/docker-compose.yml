@@ -185,6 +185,143 @@ services:
   #   networks:
   #     - backend
 
+  workout-service:
+    build: ./workout-service
+    ports:
+      - "3015:3004"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/workout_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: workout_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  nutrition-service:
+    build: ./nutrition-service
+    ports:
+      - "3016:3003"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/nutrition_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: nutrition_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  order-service:
+    build: ./order-service
+    ports:
+      - "3017:3004"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/order_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: order_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  payment-service:
+    build: ./payment-service
+    ports:
+      - "3018:3003"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/payment_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: payment_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      NODE_ENV: production
+      # Apple Pay Configuration
+      APPLE_PAY_MERCHANT_ID: merchant.uth.foodorder
+      APPLE_PAY_PROCESSING_CERTIFICATE_PATH: /app/certs/apple-pay-processing.p12
+      APPLE_PAY_PROCESSING_CERTIFICATE_PASSWORD: your-cert-password
+      # PayOS Configuration
+      PAYOS_CLIENT_ID: your-payos-client-id
+      PAYOS_API_KEY: your-payos-api-key
+      PAYOS_CHECKSUM_KEY: your-payos-checksum-key
+      PAYOS_RETURN_URL: http://localhost:3000/payment/success
+      PAYOS_CANCEL_URL: http://localhost:3000/payment/cancel
+      # Mock Gateway Configuration
+      MOCK_GATEWAY_SUCCESS_RATE: 0.9
+      MOCK_GATEWAY_PROCESS_TIME: 2000
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  partner-service:
+    build: ./partner-service
+    ports:
+      - "3019:3004"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/partner_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: partner_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      NODE_ENV: production
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
+  delivery-service:
+    build: ./delivery-service
+    ports:
+      - "3020:3004"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/delivery_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: delivery_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      NODE_ENV: production
+      # Service URLs for integration
+      AUTH_SERVICE_URL: http://auth-service:3001
+      ORDER_SERVICE_URL: http://order-service:3004
+      PARTNER_SERVICE_URL: http://partner-service:3004
+      PAYMENT_SERVICE_URL: http://payment-service:3003
+      # CORS Configuration
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:8080
+      # Rate Limiting
+      RATE_LIMIT_WINDOW: 900000
+      RATE_LIMIT_MAX: 100
+      # File Upload
+      JSON_LIMIT: 10mb
+      URL_ENCODED_LIMIT: 10mb
+      # Frontend URL for WebSocket CORS
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      - postgres
+      - auth-service
+      - order-service
+      - partner-service
+      - payment-service
+    networks:
+      - backend
+
 networks:
   backend:
     driver: bridge
