@@ -10,7 +10,8 @@ import {
 
 interface AuthenticatedSocket extends Socket {
   user?: JWTPayload;
-  rooms?: Set<string>;
+  // Socket.rooms is a Set<string> on the Socket type; keep the same shape to satisfy the interface
+  rooms: Set<string>;
 }
 
 interface SocketData {
