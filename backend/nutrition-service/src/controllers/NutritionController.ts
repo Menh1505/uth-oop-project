@@ -56,12 +56,12 @@ export class NutritionController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: food
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to get food',
         message: error.message
@@ -105,13 +105,13 @@ export class NutritionController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: food,
         message: 'Food updated successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update food',
         message: error.message
@@ -133,12 +133,12 @@ export class NutritionController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Food deleted successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to delete food',
         message: error.message
@@ -190,12 +190,12 @@ export class NutritionController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: mealLog
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to get meal log',
         message: error.message
@@ -239,13 +239,13 @@ export class NutritionController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         data: mealLog,
         message: 'Meal log updated successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to update meal log',
         message: error.message
@@ -267,12 +267,12 @@ export class NutritionController {
         });
       }
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Meal log deleted successfully'
       });
     } catch (error: any) {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Failed to delete meal log',
         message: error.message
