@@ -202,6 +202,23 @@ services:
     networks:
       - backend
 
+  nutrition-service:
+    build: ./nutrition-service
+    ports:
+      - "3016:3003"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/nutrition_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: nutrition_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
 networks:
   backend:
     driver: bridge
