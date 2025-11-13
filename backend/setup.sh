@@ -148,6 +148,7 @@ show_services_info() {
     echo "├── Admin Service:    http://localhost:3013"
     echo "├── Workout Service:  http://localhost:3015"
     echo "├── Nutrition Service: http://localhost:3016"
+    echo "├── Order Service:    http://localhost:3017"
     echo "├── RabbitMQ UI:      http://localhost:15672 (admin/admin)"
     echo "└── PostgreSQL:       localhost:5432 (postgres/postgres_password)"
     echo
@@ -155,6 +156,7 @@ show_services_info() {
     echo "curl http://localhost:3000/api/auth/"
     echo "curl http://localhost:3015/api/workouts/health"
     echo "curl http://localhost:3016/api/nutrition/health"
+    echo "curl http://localhost:3017/api/orders/health"
     echo
     echo "📊 Monitor logs:"
     echo "docker compose logs -f"

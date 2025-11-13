@@ -23,6 +23,7 @@ docker ps
 | **Admin Service** | http://localhost:3013 | Quản trị hệ thống |
 | **Workout Service** | http://localhost:3015 | Quản lý tập luyện |
 | **Nutrition Service** | http://localhost:3016 | Theo dõi dinh dưỡng |
+| **Order Service** | http://localhost:3017 | Quản lý đơn hàng |
 | **RabbitMQ UI** | http://localhost:15672 | Quản lý message queue (admin/admin) |
 
 ## 📱 Test API
@@ -32,12 +33,13 @@ docker ps
 curl http://localhost:3000/api/auth/
 curl http://localhost:3015/api/workouts/health
 curl http://localhost:3016/api/nutrition/health
+curl http://localhost:3017/api/orders/health
 
 # Xem logs
 docker compose logs -f
 
 # Xem logs của service cụ thể  
-docker compose logs -f nutrition-service
+docker compose logs -f order-service
 ```
 
 ## 🛑 Dừng hệ thống
