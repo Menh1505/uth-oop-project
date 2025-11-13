@@ -29,46 +29,46 @@ services:
       - backend
 
   # Observability Stack
-  # prometheus:
-  #   image: prom/prometheus:latest
-  #   ports:
-  #     - "9090:9090"
-  #   volumes:
-  #     - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-  #     - prometheus_data:/prometheus
-  #   command:
-  #     - '--config.file=/etc/prometheus/prometheus.yml'
-  #     - '--storage.tsdb.path=/prometheus'
-  #     - '--web.console.libraries=/etc/prometheus/console_libraries'
-  #     - '--web.console.templates=/etc/prometheus/consoles'
-  #     - '--storage.tsdb.retention.time=200h'
-  #     - '--web.enable-lifecycle'
-  #   networks:
-  #     - backend
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - backend
 
-  # grafana:
-  #   image: grafana/grafana:latest
-  #   ports:
-  #     - "3001:3000"
-  #   environment:
-  #     GF_SECURITY_ADMIN_PASSWORD: admin
-  #     GF_USERS_ALLOW_SIGN_UP: false
-  #   volumes:
-  #     - grafana_data:/var/lib/grafana
-  #     - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
-  #     - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
-  #   networks:
-  #     - backend
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
+    networks:
+      - backend
 
-  # jaeger:
-  #   image: jaegertracing/all-in-one:latest
-  #   ports:
-  #     - "16686:16686"
-  #     - "14268:14268"
-  #   environment:
-  #     COLLECTOR_OTLP_ENABLED: true
-  #   networks:
-  #     - backend
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    networks:
+      - backend
 
   nginx:
     image: nginx:alpine
@@ -80,6 +80,7 @@ services:
       - auth-service
       - user-service
       - admin-service
+      - catalog-service
       - workout-service
       - nutrition-service
       - order-service
@@ -147,28 +148,28 @@ services:
     networks:
       - backend
 
-  # catalog-service:
-  #   build: ./catalog-service
-  #   ports:
-  #     - "3014:3003"
-  #   environment:
-  #     DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/catalog_db
-  #     DB_HOST: postgres
-  #     DB_USER: postgres
-  #     DB_PASSWORD: postgres_password
-  #     DB_NAME: catalog_db
-  #     DB_PORT: 5432
-  #     JWT_SECRET: shared-jwt-secret-key-12345
-  #     RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-  #     JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-  #     PROMETHEUS_PORT: 9464
-  #   depends_on:
-  #     - postgres
-  #     - rabbitmq
-  #     - prometheus
-  #     - jaeger
-  #   networks:
-  #     - backend
+  catalog-service:
+    build: ./catalog-service
+    ports:
+      - "3014:3003"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/catalog_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: catalog_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      PROMETHEUS_PORT: 9464
+    depends_on:
+      - postgres
+      - rabbitmq
+      - prometheus
+      - jaeger
+    networks:
+      - backend
 
   workout-service:
     build: ./workout-service
@@ -351,5 +352,5 @@ networks:
 volumes:
   postgres_data:
   rabbitmq_data:
-  # prometheus_data:
-  # grafana_data:
+  prometheus_data:
+  grafana_data:
