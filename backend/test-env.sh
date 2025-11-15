@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-PROJECT_NAME="uth-api-gateway-test"
+PROJECT_NAME="uth-test"
 COMPOSE_FILE="docker-compose.yml"
 
 show_help() {
@@ -98,7 +98,7 @@ check_health() {
 
 stop_services() {
     echo -e "${YELLOW}🛑 Đang dừng Testing Environment...${NC}"
-    docker-compose -p $PROJECT_NAME -f $COMPOSE_FILE down
+    docker compose -p $PROJECT_NAME -f $COMPOSE_FILE down
     echo -e "${GREEN}✅ Services đã được dừng${NC}"
 }
 
@@ -112,16 +112,16 @@ show_logs() {
     local service=$1
     if [ -n "$service" ]; then
         echo -e "${BLUE}📋 Logs cho service: $service${NC}"
-        docker-compose -p $PROJECT_NAME -f $COMPOSE_FILE logs -f $service
+        docker compose -p $PROJECT_NAME -f $COMPOSE_FILE logs -f $service
     else
         echo -e "${BLUE}📋 Logs cho tất cả services:${NC}"
-        docker-compose -p $PROJECT_NAME -f $COMPOSE_FILE logs -f
+        docker compose -p $PROJECT_NAME -f $COMPOSE_FILE logs -f
     fi
 }
 
 show_status() {
     echo -e "${BLUE}📊 Trạng thái Services:${NC}"
-    docker-compose -p $PROJECT_NAME -f $COMPOSE_FILE ps
+    docker compose -p $PROJECT_NAME -f $COMPOSE_FILE ps
     
     echo ""
     echo -e "${BLUE}🏥 Health Check:${NC}"
@@ -164,7 +164,7 @@ show_status() {
 
 clean_environment() {
     echo -e "${YELLOW}🧹 Đang dọn dẹp Testing Environment...${NC}"
-    docker-compose -p $PROJECT_NAME -f $COMPOSE_FILE down -v --remove-orphans
+    docker compose -p $PROJECT_NAME -f $COMPOSE_FILE down -v --remove-orphans
     docker system prune -f
     echo -e "${GREEN}✅ Environment đã được dọn dẹp${NC}"
 }

@@ -9,12 +9,11 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: uth
+      uth: uth
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh
       - ./migrations:/migrations:ro
     networks:
       - backend
@@ -72,7 +71,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:8080
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8080
       - CORS_CREDENTIALS=true
       - CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
       - CIRCUIT_BREAKER_RESET_TIMEOUT=60000
@@ -101,10 +100,10 @@ services:
     ports:
       - "3011:3001"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/auth_db
+      DATABASE_URL: postgresql://postgres:uth@postgres:5432/auth_db
       DB_HOST: postgres
       DB_USER: postgres
-      DB_PASSWORD: postgres_password
+      DB_PASSWORD: uth
       DB_NAME: auth_db
       DB_PORT: 5432
       JWT_SECRET: shared-jwt-secret-key-12345
@@ -130,10 +129,10 @@ services:
     ports:
       - "3012:3002"
     environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/user_db
+      DATABASE_URL: postgresql://postgres:uth@postgres:5432/user_db
       DB_HOST: postgres
       DB_USER: postgres
-      DB_PASSWORD: postgres_password
+      DB_PASSWORD: uth
       DB_NAME: user_db
       DB_PORT: 5432
       JWT_SECRET: shared-jwt-secret-key-12345
