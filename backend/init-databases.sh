@@ -7,27 +7,19 @@ set -e
 echo "🚀 Initializing FitFood databases..."
 
 # Create databases for different services
-echo "Creating databases..."
+echo "Creating database..."
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
-    -- Create auth service database
-    CREATE DATABASE auth_db;
-    
-    -- Create user service database  
-    CREATE DATABASE user_db;
-    
-    -- Create main fitfood database
+    -- Create main fitfood database (shared by all services)
     CREATE DATABASE fitfood_db;
     
     -- Grant privileges
-    GRANT ALL PRIVILEGES ON DATABASE auth_db TO $POSTGRES_USER;
-    GRANT ALL PRIVILEGES ON DATABASE user_db TO $POSTGRES_USER;
     GRANT ALL PRIVILEGES ON DATABASE fitfood_db TO $POSTGRES_USER;
 EOSQL
 
 echo "✅ Databases created successfully!"
 
 # Run migrations if migration files exist
-if [ -d "/migrations" ] && [ "$(ls -A /migrations/*.sql 2>/dev/null)" ]; then
+if [ -d "/docker-entrypoint-initdb.d/migrations" ] && [ "$(ls -A /docker-entrypoint-initdb.d/migrations/*.sql 2>/dev/null)" ]; then
     echo "🔄 Running migrations..."
     
     # Function to run migrations for a specific database
@@ -47,7 +39,7 @@ if [ -d "/migrations" ] && [ "$(ls -A /migrations/*.sql 2>/dev/null)" ]; then
 EOSQL
         
         # Run migration files in order
-        for migration_file in $(ls /migrations/$migration_pattern 2>/dev/null | sort); do
+        for migration_file in $(ls /docker-entrypoint-initdb.d/migrations/$migration_pattern 2>/dev/null | sort); do
             filename=$(basename "$migration_file")
             
             # Check if migration has already been run
@@ -70,24 +62,19 @@ EOSQL
     }
     
     # Run FitFood main database migrations (all numbered migration files)
-    if [ "$(ls /migrations/0*.sql 2>/dev/null)" ]; then
+    if [ "$(ls /docker-entrypoint-initdb.d/migrations/0*.sql 2>/dev/null)" ]; then
         run_migrations_for_db "fitfood_db" "0*.sql"
     fi
     
-    # Note: Service-specific migrations would be handled by the services themselves
-    # when they start up, not here in the database initialization
-    
     echo "✅ All migrations completed successfully!"
 else
-    echo "⚠️ No migration files found in /migrations directory"
+    echo "⚠️ No migration files found in /docker-entrypoint-initdb.d/migrations directory"
 fi
 
 echo "🎉 FitFood database initialization completed!"
 echo ""
-echo "Created databases:"
-echo "  - auth_db (for authentication service)"  
-echo "  - user_db (for user service)"
-echo "  - fitfood_db (main application database)"
+echo "Created database:"
+echo "  - fitfood_db (shared by all services)"
 echo ""
-echo "You can connect to the databases using:"
+echo "You can connect to the database using:"
 echo "  psql -h localhost -p 5432 -U $POSTGRES_USER -d fitfood_db"
