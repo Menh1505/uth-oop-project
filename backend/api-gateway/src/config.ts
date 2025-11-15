@@ -68,6 +68,16 @@ export const defaultConfig: GatewayConfig = {
       retryAttempts: 3,
       circuitBreakerEnabled: true,
     },
+    {
+      name: 'goal-service',
+      instances: [
+        { host: 'goal-service', port: 3006, weight: 1, healthy: true }
+      ],
+      healthPath: '/health',
+      timeout: 30000,
+      retryAttempts: 3,
+      circuitBreakerEnabled: true,
+    },
   ],
   routes: [
     // Authentication routes with stricter rate limiting
@@ -144,6 +154,19 @@ export const defaultConfig: GatewayConfig = {
     {
       path: '/api/exercises',
       service: 'exercise-service',
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      rateLimitConfig: {
+        max: 50,
+        timeWindow: '1 minute',
+        keyGenerator: 'ip'
+      },
+      authRequired: true,
+      stripPath: true,
+    },
+    // Goal management routes
+    {
+      path: '/api/goals',
+      service: 'goal-service',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       rateLimitConfig: {
         max: 50,
