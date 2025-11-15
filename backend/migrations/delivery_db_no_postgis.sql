@@ -12,7 +12,7 @@
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
--- postgis removed -- For geographical data
+-- postgis extension removed - using jsonb instead
 CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- For fuzzy text search
 
 -- ============================================
@@ -465,7 +465,7 @@ CREATE TABLE delivery_notifications (
 CREATE INDEX idx_drivers_status ON drivers(status);
 CREATE INDEX idx_drivers_vehicle_type ON drivers(vehicle_type);
 CREATE INDEX idx_drivers_rating ON drivers(rating DESC);
-CREATE INDEX idx_drivers_location ON drivers USING btree;
+CREATE INDEX idx_drivers_location ON drivers USING btree(current_location);
 CREATE INDEX idx_drivers_active ON drivers(status, last_active) WHERE status IN ('AVAILABLE', 'BUSY', 'ON_DELIVERY');
 CREATE INDEX idx_drivers_email ON drivers(email);
 CREATE INDEX idx_drivers_phone ON drivers(phone);
@@ -480,8 +480,8 @@ CREATE INDEX idx_deliveries_partner ON deliveries(partner_id);
 CREATE INDEX idx_deliveries_order ON deliveries(order_id);
 CREATE INDEX idx_deliveries_priority ON deliveries(priority);
 CREATE INDEX idx_deliveries_created ON deliveries(created_at DESC);
-CREATE INDEX idx_deliveries_pickup_location ON deliveries USING btree;
-CREATE INDEX idx_deliveries_delivery_location ON deliveries USING btree;
+CREATE INDEX idx_deliveries_pickup_location ON deliveries USING btree(pickup_location);
+CREATE INDEX idx_deliveries_delivery_location ON deliveries USING btree(delivery_location);
 CREATE INDEX idx_deliveries_active ON deliveries(status, created_at) WHERE status IN ('PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT');
 
 -- Assignment indexes
@@ -494,7 +494,7 @@ CREATE INDEX idx_assignments_expires ON delivery_assignments(expires_at) WHERE i
 CREATE INDEX idx_tracking_delivery ON tracking_events(delivery_id, timestamp);
 CREATE INDEX idx_tracking_driver ON tracking_events(driver_id, timestamp);
 CREATE INDEX idx_tracking_type ON tracking_events(event_type, timestamp);
-CREATE INDEX idx_tracking_location ON tracking_events USING btree;
+CREATE INDEX idx_tracking_location ON tracking_events USING btree(location);
 
 -- Route indexes
 CREATE INDEX idx_routes_driver ON delivery_routes(driver_id, route_date);
@@ -503,8 +503,8 @@ CREATE INDEX idx_routes_date ON delivery_routes(route_date DESC);
 
 -- Zone indexes
 CREATE INDEX idx_zones_active ON delivery_zones(is_active);
-CREATE INDEX idx_zones_boundaries ON delivery_zones USING btree;
-CREATE INDEX idx_zones_center ON delivery_zones USING btree;
+CREATE INDEX idx_zones_boundaries ON delivery_zones USING btree(boundaries);
+CREATE INDEX idx_zones_center ON delivery_zones USING btree(center_point);
 
 -- Rating indexes
 CREATE INDEX idx_ratings_driver ON driver_ratings(driver_id, created_at DESC);
@@ -594,20 +594,20 @@ BEGIN
     -- Update location point for drivers
     IF TG_TABLE_NAME = 'drivers' THEN
         IF NEW.current_latitude IS NOT NULL AND NEW.current_longitude IS NOT NULL THEN
---             NEW.current_location = ST_SetSRID(ST_MakePoint(NEW.current_longitude, NEW.current_latitude), 4326);
+            NEW.current_location = ST_SetSRID(ST_MakePoint(NEW.current_longitude, NEW.current_latitude), 4326);
         END IF;
     END IF;
     
     -- Update location points for deliveries
     IF TG_TABLE_NAME = 'deliveries' THEN
---         NEW.pickup_location = ST_SetSRID(ST_MakePoint(NEW.pickup_longitude, NEW.pickup_latitude), 4326);
---         NEW.delivery_location = ST_SetSRID(ST_MakePoint(NEW.delivery_longitude, NEW.delivery_latitude), 4326);
+        NEW.pickup_location = ST_SetSRID(ST_MakePoint(NEW.pickup_longitude, NEW.pickup_latitude), 4326);
+        NEW.delivery_location = ST_SetSRID(ST_MakePoint(NEW.delivery_longitude, NEW.delivery_latitude), 4326);
     END IF;
     
     -- Update location point for tracking events
     IF TG_TABLE_NAME = 'tracking_events' THEN
         IF NEW.latitude IS NOT NULL AND NEW.longitude IS NOT NULL THEN
---             NEW.location = ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
+            NEW.location = ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326);
         END IF;
     END IF;
     
@@ -696,52 +696,52 @@ ORDER BY delivery_date DESC;
 -- ============================================
 
 -- Function to get nearby drivers
--- Function removed - requires PostGIS
-/*
---     target_lat DECIMAL(10,8),
---     target_lng DECIMAL(11,8),
---     max_distance_km DECIMAL DEFAULT 10.0,
---     vehicle_types VARCHAR[] DEFAULT ARRAY['MOTORBIKE', 'CAR', 'BICYCLE']
--- )
--- RETURNS TABLE (
---     driver_id UUID,
---     driver_name VARCHAR(100),
---     vehicle_type vehicle_type_enum,
---     distance_km DECIMAL,
---     rating DECIMAL(3,2),
---     current_deliveries BIGINT
--- ) AS $$
--- BEGIN
---     RETURN QUERY
---     SELECT 
---         d.id,
---         d.full_name,
---         d.vehicle_type,
---         ROUND(
---             ST_Distance(
---                 ST_SetSRID(ST_MakePoint(target_lng, target_lat), 4326)::geography,
---                 d.current_location::geography
---             ) / 1000.0, 2
---         ) as distance_km,
---         d.rating,
---         COUNT(del.id) as current_deliveries
---     FROM drivers d
---     LEFT JOIN deliveries del ON d.id = del.driver_id 
---         AND del.status IN ('ASSIGNED', 'PICKED_UP', 'IN_TRANSIT')
---     WHERE d.status = 'AVAILABLE'
---         AND d.current_location IS NOT NULL
---         AND d.vehicle_type = ANY(vehicle_types::vehicle_type_enum[])
---         AND ST_DWithin(
---             ST_SetSRID(ST_MakePoint(target_lng, target_lat), 4326)::geography,
---             d.current_location::geography,
---             max_distance_km * 1000
---         )
---     GROUP BY d.id, d.full_name, d.vehicle_type, d.rating, d.current_location
---     ORDER BY distance_km ASC, d.rating DESC, current_deliveries ASC;
--- END;
-*/
+CREATE OR REPLACE FUNCTION get_nearby_drivers(
+    target_lat DECIMAL(10,8),
+    target_lng DECIMAL(11,8),
+    max_distance_km DECIMAL DEFAULT 10.0,
+    vehicle_types VARCHAR[] DEFAULT ARRAY['MOTORBIKE', 'CAR', 'BICYCLE']
+)
+RETURNS TABLE (
+    driver_id UUID,
+    driver_name VARCHAR(100),
+    vehicle_type vehicle_type_enum,
+    distance_km DECIMAL,
+    rating DECIMAL(3,2),
+    current_deliveries BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        d.id,
+        d.full_name,
+        d.vehicle_type,
+        ROUND(
+            ST_Distance(
+                ST_SetSRID(ST_MakePoint(target_lng, target_lat), 4326)::geography,
+                d.current_location::geography
+            ) / 1000.0, 2
+        ) as distance_km,
+        d.rating,
+        COUNT(del.id) as current_deliveries
+    FROM drivers d
+    LEFT JOIN deliveries del ON d.id = del.driver_id 
+        AND del.status IN ('ASSIGNED', 'PICKED_UP', 'IN_TRANSIT')
+    WHERE d.status = 'AVAILABLE'
+        AND d.current_location IS NOT NULL
+        AND d.vehicle_type = ANY(vehicle_types::vehicle_type_enum[])
+        AND ST_DWithin(
+            ST_SetSRID(ST_MakePoint(target_lng, target_lat), 4326)::geography,
+            d.current_location::geography,
+            max_distance_km * 1000
+        )
+    GROUP BY d.id, d.full_name, d.vehicle_type, d.rating, d.current_location
+    ORDER BY distance_km ASC, d.rating DESC, current_deliveries ASC;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Function to calculate delivery fee
+CREATE OR REPLACE FUNCTION calculate_delivery_fee(
     pickup_lat DECIMAL(10,8),
     pickup_lng DECIMAL(11,8),
     delivery_lat DECIMAL(10,8),
@@ -762,9 +762,9 @@ DECLARE
     total_fee DECIMAL;
 BEGIN
     -- Calculate distance
---     distance_km := ST_Distance(
---         ST_SetSRID(ST_MakePoint(pickup_lng, pickup_lat), 4326)::geography,
---         ST_SetSRID(ST_MakePoint(delivery_lng, delivery_lat), 4326)::geography
+    distance_km := ST_Distance(
+        ST_SetSRID(ST_MakePoint(pickup_lng, pickup_lat), 4326)::geography,
+        ST_SetSRID(ST_MakePoint(delivery_lng, delivery_lat), 4326)::geography
     ) / 1000.0;
     
     -- Calculate distance fee

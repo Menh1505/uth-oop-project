@@ -3,7 +3,8 @@ FROM node:18-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production
+# Install all dependencies (including dev for TypeScript compilation)
+RUN npm ci
 
 COPY . .
 RUN npm run build
