@@ -4,6 +4,10 @@ export type OrderStatus = "pending" | "confirmed" | "preparing" | "delivering" |
 
 export type UserProfile = {
   name: string;
+  avatar?: string; // avatar URL or base64
+  phone?: string;
+  email?: string;
+  bio?: string;
   goal: Goal;
   diet: DietPref;
   budgetPerMeal: number; // VND

@@ -1,25 +1,24 @@
-import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { jwtConfig } from '../config/jwt';
+import { JwtClaims } from '../models/User';
 
 export interface AuthRequest extends Request {
-  user?: any;
+  user?: JwtClaims;
 }
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    res.status(401).json({ message: 'No token provided' });
-    return;
-  }
-
+export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ message: 'Missing bearer token' });
+  const token = auth.slice(7);
   try {
-    const decoded = jwt.verify(token, jwtConfig.secret as string);
+    const decoded = jwt.verify(token, jwtConfig.secret, {
+      issuer: jwtConfig.issuer,
+      audience: jwtConfig.audience,
+    }) as JwtClaims;
     req.user = decoded;
     next();
-  } catch (err) {
-    res.status(401).json({ message: 'Invalid token' });
+  } catch {
+    return res.status(401).json({ message: 'Invalid token' });
   }
 };

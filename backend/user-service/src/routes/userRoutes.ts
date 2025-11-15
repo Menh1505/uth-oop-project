@@ -1,38 +1,17 @@
 import { Router } from 'express';
 import { UserController } from '../controllers/UserController';
-import { authenticate } from '../middleware/authMiddleware';
+import { authenticate } from '../middleware/authenticate';
 
 const router = Router();
 
-// Simple status endpoint for testing (public)
-router.get('/status', (req, res) => {
-  res.json({
-    service: 'user-service',
-    status: 'healthy',
-    version: '1.0.0',
-    database: 'user_db',
-    timestamp: new Date().toISOString(),
-    endpoints: [
-      'GET /profile',
-      'PUT /profile',
-      'GET /users',
-      'GET /status'
-    ]
-  });
-});
+router.get('/status', UserController.status);
 
-// All routes require authentication
 router.use(authenticate);
+router.get('/me', UserController.getMe);
+router.put('/me', UserController.updateMe);
+router.post('/me/avatar', UserController.uploadAvatar);
 
-// Current user profile endpoints
-router.get('/profile', UserController.getProfile);
-router.put('/profile', UserController.updateProfile);
-
-// Admin endpoints for managing all users
-router.get('/users', UserController.getAllUsers);
-router.get('/users/:id', UserController.getUserById);
-router.post('/users', UserController.createUser);
-router.put('/users/:id', UserController.updateUser);
-router.delete('/users/:id', UserController.deleteUser);
+// admin
+router.get('/admin/users', UserController.listUsers);
 
 export default router;

@@ -1,6 +1,4 @@
-// src/repositories/LoginEventRepository.ts
-import pool from '../config/database';  // ⬅️ đúng đường dẫn
-// ❌ bỏ: import { v4 as uuidv4 } from 'uuid';
+import pool from '../config/database';
 
 export type UserLoggedInEvent = {
   userId?: string;
@@ -11,19 +9,6 @@ export type UserLoggedInEvent = {
 };
 
 export class LoginEventRepository {
-  static async init() {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS login_events (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID,
-        email TEXT NOT NULL,
-        role TEXT,
-        occurred_at TIMESTAMPTZ NOT NULL,
-        raw JSONB NOT NULL
-      )
-    `);
-  }
-
   static async recordLogin(evt: UserLoggedInEvent) {
     await pool.query(
       `INSERT INTO login_events (user_id, email, role, occurred_at, raw)
@@ -36,5 +21,18 @@ export class LoginEventRepository {
         JSON.stringify(evt),
       ]
     );
+  }
+
+  static async markProcessed(eventId: string, type: string) {
+    await pool.query(
+      `INSERT INTO processed_events (event_id, event_type) VALUES ($1, $2)
+       ON CONFLICT (event_id) DO NOTHING`,
+      [eventId, type]
+    );
+  }
+
+  static async isProcessed(eventId: string): Promise<boolean> {
+    const q = await pool.query(`SELECT 1 FROM processed_events WHERE event_id = $1`, [eventId]);
+    return (q.rowCount ?? 0) > 0;
   }
 }

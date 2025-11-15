@@ -3,33 +3,44 @@ import { AuthController } from '../controllers/authController';
 
 const router = Router();
 
-router.post('/login', AuthController.login);
-router.post('/admin/login', AuthController.adminLogin);
-router.post('/register', AuthController.register);
-
-// Logout requires authentication
-router.post('/logout', AuthController.logout);
-
-// Verify token
-router.get('/verify', AuthController.verify);
-router.get("/health", AuthController.health);
-// Simple status endpoint for testing
-router.get('/status', (req, res) => {
+router.get('/health', AuthController.health);
+router.get('/status', (_req, res) => {
   res.json({
     service: 'auth-service',
     status: 'healthy',
-    version: '1.0.0',
-    database: 'auth_db',
+    version: '1.1.0',
+    database: process.env.DB_NAME || 'auth_db',
     timestamp: new Date().toISOString(),
     endpoints: [
-      'POST /login',
-      'POST /admin/login',
-      'POST /register',
-      'POST /logout',
-      'GET /verify',
-      'GET /status'
+      'POST /auth/register',
+      'POST /auth/login',
+      'POST /auth/admin/login',
+      'POST /auth/refresh',
+      'POST /auth/logout',
+      'GET  /auth/verify',
+      'GET  /auth/sessions',
+      'DELETE /auth/sessions/:sessionId',
+      'DELETE /auth/sessions?all=1',
+      'GET  /auth/blacklist   (admin)',
+      'POST /auth/blacklist   (admin)'
     ]
   });
 });
+
+router.post('/register', AuthController.register);
+router.post('/login', AuthController.login);
+router.post('/admin/login', AuthController.adminLogin);
+router.post('/refresh', AuthController.refresh);
+router.post('/logout', AuthController.logout);
+router.get('/verify', AuthController.verify);
+
+// sessions
+router.get('/sessions', AuthController.listSessions);
+router.delete('/sessions/:sessionId', AuthController.deleteSession);
+router.delete('/sessions', AuthController.deleteOtherSessions);
+
+// blacklist (gắn guard admin tại gateway hoặc thêm middleware role ở đây)
+router.get('/blacklist', AuthController.adminListBlacklist);
+router.post('/blacklist', AuthController.adminBlacklistToken);
 
 export default router;

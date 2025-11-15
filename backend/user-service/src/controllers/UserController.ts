@@ -1,143 +1,115 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/authenticate';
 import { UserService } from '../services/UserService';
-import { CreateUserRequest, UpdateUserRequest } from '../models/User';
-import { AuthRequest } from '../middleware/authMiddleware';
 
 export class UserController {
-  static getProfile(req: AuthRequest, res: Response): void {
+  static async status(_req: AuthRequest, res: Response) {
+    res.json({
+      service: 'user-service',
+      status: 'healthy',
+      version: '1.0.0',
+      database: process.env.DB_NAME || 'user_db',
+      timestamp: new Date().toISOString(),
+      endpoints: [
+        'GET /users/me',
+        'PUT /users/me',
+        'GET /admin/users?limit=&offset='
+      ]
+    });
+  }
+
+  static async getMe(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
-      if (!userId) {
-        res.status(401).json({ message: 'User not authenticated' });
-        return;
+      if (!userId) return res.status(401).json({ message: 'User not authenticated' });
+      const data = await UserService.getProfile(userId);
+      if (!data || !data.profile) {
+        // Profile not found - user needs onboarding
+        return res.status(200).json({ 
+          onboarding: true, 
+          message: 'Profile not setup yet, please complete onboarding',
+          user_id: userId,
+          email: req.user?.email
+        });
       }
-
-      const user = UserService.getUserById(userId);
-      if (!user) {
-        res.status(404).json({ message: 'User not found' });
-        return;
-      }
-
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch profile' });
+      res.json({ onboarding: false, ...data });
+    } catch (error: any) {
+      console.error('getMe error:', error);
+      res.status(500).json({ 
+        message: 'Failed to fetch profile',
+        error: error.message || 'Unknown error'
+      });
     }
   }
 
-  static updateProfile(req: AuthRequest, res: Response): void {
+  static async updateMe(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
-      if (!userId) {
-        res.status(401).json({ message: 'User not authenticated' });
-        return;
-      }
-
-      const updateData: UpdateUserRequest = req.body;
-      const updatedUser = UserService.updateUser(userId, updateData);
-
-      if (!updatedUser) {
-        res.status(404).json({ message: 'User not found' });
-        return;
-      }
-
-      res.json(updatedUser);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to update profile' });
+      if (!userId) return res.status(401).json({ message: 'User not authenticated' });
+      const updated = await UserService.updateProfile(userId, req.body);
+      res.json({ onboarding: false, ...updated });
+    } catch (error: any) {
+      console.error('updateMe error:', error);
+      res.status(500).json({ 
+        message: 'Failed to update profile',
+        error: error.message || 'Unknown error'
+      });
     }
   }
 
-  static getAllUsers(req: AuthRequest, res: Response): void {
+  static async uploadAvatar(req: AuthRequest, res: Response) {
     try {
-      const users = UserService.getAllUsers();
-      res.json(users);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch users' });
-    }
-  }
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: 'User not authenticated' });
 
-  static getUserById(req: AuthRequest, res: Response): void {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        res.status(400).json({ message: 'Invalid user ID' });
-        return;
+      // Get base64 avatar from request body or files
+      let avatarBase64: string | null = null;
+
+      // Check for file in body (raw binary)
+      if ((req as any).body && typeof (req as any).body === 'string') {
+        avatarBase64 = (req as any).body;
       }
 
-      const user = UserService.getUserById(id);
-      if (!user) {
-        res.status(404).json({ message: 'User not found' });
-        return;
+      // Or get from form field
+      const avatarField = (req as any).body?.avatar;
+      if (avatarField) {
+        avatarBase64 = avatarField;
       }
 
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch user' });
-    }
-  }
-
-  static createUser(req: AuthRequest, res: Response): void {
-    try {
-      const userData: CreateUserRequest = req.body;
+      if (!avatarBase64) {
+        return res.status(400).json({ message: 'No avatar data provided' });
+      }
 
       // Basic validation
-      if (!userData.username || !userData.email) {
-        res.status(400).json({ message: 'Username and email are required' });
-        return;
+      if (typeof avatarBase64 !== 'string' || !avatarBase64.startsWith('data:image/')) {
+        return res.status(400).json({ message: 'Invalid avatar format. Must be base64 image data.' });
       }
 
-      // Check if username already exists
-      const existingUser = UserService.getUserByUsername(userData.username);
-      if (existingUser) {
-        res.status(409).json({ message: 'Username already exists' });
-        return;
-      }
+      // Update profile with avatar
+      const updated = await UserService.updateProfile(userId, {
+        avatar_url: avatarBase64
+      });
 
-      const newUser = UserService.createUser(userData);
-      res.status(201).json(newUser);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to create user' });
+      res.json({ 
+        message: 'Avatar uploaded successfully',
+        avatar_url: avatarBase64,
+        profile: updated
+      });
+    } catch (error: any) {
+      console.error('Avatar upload error:', error);
+      res.status(500).json({ 
+        message: 'Failed to upload avatar',
+        error: error.message || 'Unknown error'
+      });
     }
   }
 
-  static updateUser(req: AuthRequest, res: Response): void {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        res.status(400).json({ message: 'Invalid user ID' });
-        return;
-      }
-
-      const updateData: UpdateUserRequest = req.body;
-      const updatedUser = UserService.updateUser(id, updateData);
-
-      if (!updatedUser) {
-        res.status(404).json({ message: 'User not found' });
-        return;
-      }
-
-      res.json(updatedUser);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to update user' });
-    }
-  }
-
-  static deleteUser(req: AuthRequest, res: Response): void {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        res.status(400).json({ message: 'Invalid user ID' });
-        return;
-      }
-
-      const deleted = UserService.deleteUser(id);
-      if (!deleted) {
-        res.status(404).json({ message: 'User not found' });
-        return;
-      }
-
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to delete user' });
-    }
+  // simple admin
+  static async listUsers(req: AuthRequest, res: Response) {
+    if (req.user?.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+    const limit = parseInt(String(req.query.limit || '50'), 10);
+    const offset = parseInt(String(req.query.offset || '0'), 10);
+    const data = await UserService.listProfiles(limit, offset);
+    res.json({ items: data, limit, offset });
   }
 }

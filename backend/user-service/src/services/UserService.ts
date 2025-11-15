@@ -1,46 +1,31 @@
-import { User, CreateUserRequest, UpdateUserRequest } from '../models/User';
-
-// Mock database - in production, replace with real database
-let users: User[] = [
-  { id: 1, username: 'admin', email: 'admin@example.com' },
-];
+import { AddressRepository } from '../repositories/AddressRepository';
+import { PreferencesRepository } from '../repositories/PreferencesRepository';
+import { ProfileRepository } from '../repositories/ProfileRepository';
+import { Profile, UpdateProfilePayload } from '../models/User';
 
 export class UserService {
-  static getAllUsers(): User[] {
-    return users;
+  static async getProfile(userId: string) {
+    const [p, prefs, addrs] = await Promise.all([
+      ProfileRepository.getById(userId),
+      PreferencesRepository.get(userId),
+      AddressRepository.list(userId),
+    ]);
+    if (!p) return null;
+    return { profile: p, preferences: prefs, addresses: addrs };
   }
 
-  static getUserById(id: number): User | null {
-    return users.find(user => user.id === id) || null;
+  static async updateProfile(userId: string, data: UpdateProfilePayload) {
+    const updated = await ProfileRepository.update(userId, data);
+    return updated;
   }
 
-  static getUserByUsername(username: string): User | null {
-    return users.find(user => user.username === username) || null;
-  }
-
-  static createUser(userData: CreateUserRequest): User {
-    const newUser: User = {
-      id: users.length + 1,
-      ...userData,
-    };
-    users.push(newUser);
-    return newUser;
-  }
-
-  static updateUser(id: number, updateData: UpdateUserRequest): User | null {
-    const userIndex = users.findIndex(user => user.id === id);
-    if (userIndex === -1) return null;
-
-    users[userIndex] = {
-      ...users[userIndex],
-      ...updateData,
-    };
-    return users[userIndex];
-  }
-
-  static deleteUser(id: number): boolean {
-    const initialLength = users.length;
-    users = users.filter(user => user.id !== id);
-    return users.length < initialLength;
+  // Admin helpers (có thể thêm paging/filter tuỳ nhu cầu)
+  static async listProfiles(limit = 50, offset = 0) {
+    // đơn giản: chỉ trả id + name + created_at
+    const q = await (await import('../config/database')).default.query(
+      `SELECT id, full_name, created_at, updated_at FROM profiles ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+    return q.rows;
   }
 }
