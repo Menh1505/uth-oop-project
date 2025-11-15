@@ -2,6 +2,7 @@ import { Pool, PoolClient } from 'pg';
 import pool from '../config/database';
 import {
   Goal,
+  GoalType,
   UserGoal,
   UserGoalWithGoal,
   CreateGoalRequest,
@@ -92,7 +93,7 @@ export class GoalRepository {
   async deleteGoal(goalId: string): Promise<boolean> {
     const query = 'DELETE FROM goals WHERE goal_id = $1';
     const result = await this.pool.query(query, [goalId]);
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   async getAllGoals(filters?: GoalFilters, pagination?: GoalPagination): Promise<Goal[]> {
@@ -245,12 +246,12 @@ export class GoalRepository {
       switch (filters.completion_status) {
         case 'Overdue':
           query += ` AND ug.target_completion_date < $${paramIndex} AND ug.status = 'Active'`;
-          values.push(now);
+          values.push(now.toISOString());
           paramIndex++;
           break;
         case 'OnTrack':
           query += ` AND ug.target_completion_date >= $${paramIndex} AND ug.status = 'Active'`;
-          values.push(now);
+          values.push(now.toISOString());
           paramIndex++;
           break;
         case 'Ahead':
@@ -261,13 +262,13 @@ export class GoalRepository {
 
     if (filters?.progress_min !== undefined) {
       query += ` AND ug.progress_percentage >= $${paramIndex}`;
-      values.push(filters.progress_min);
+      values.push(filters.progress_min.toString());
       paramIndex++;
     }
 
     if (filters?.progress_max !== undefined) {
       query += ` AND ug.progress_percentage <= $${paramIndex}`;
-      values.push(filters.progress_max);
+      values.push(filters.progress_max.toString());
       paramIndex++;
     }
 
@@ -289,7 +290,7 @@ export class GoalRepository {
     const offset = (page - 1) * limit;
 
     query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    values.push(limit, offset);
+    values.push(limit.toString(), offset.toString());
 
     const result = await this.pool.query(query, values);
     
@@ -337,7 +338,7 @@ export class GoalRepository {
   async deleteUserGoal(userGoalId: string): Promise<boolean> {
     const query = 'DELETE FROM user_goals WHERE user_goal_id = $1';
     const result = await this.pool.query(query, [userGoalId]);
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // =================== Goal Analytics ===================
@@ -405,9 +406,9 @@ export class GoalRepository {
     const completionRate = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
 
     // Determine most common goal type
-    const mostCommonGoalType = Object.keys(goalsByType).reduce((a, b) => 
+    const mostCommonGoalType = (Object.keys(goalsByType).reduce((a, b) => 
       goalsByType[a] > goalsByType[b] ? a : b, Object.keys(goalsByType)[0]
-    ) || 'General Fitness';
+    ) || 'General Fitness') as GoalType;
 
     return {
       total_goals: totalGoals,

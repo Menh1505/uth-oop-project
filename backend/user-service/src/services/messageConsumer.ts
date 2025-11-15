@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { rabbitMQConfig } from '../config/rabbitmq';
 import logger from '../config/logger';
 import { LoginEventRepository } from '../repositories/LoginEventRepository';
-import { ProfileRepository } from '../repositories/ProfileRepository';
+import { UserRepository } from '../repositories/UserRepository';
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 5000;
@@ -71,13 +71,26 @@ export class MessageConsumer {
         case 'user.registered': {
           const userId: string = event.userId;
           const guessName = (event.email as string)?.split('@')[0] || null;
-          await ProfileRepository.upsertSkeleton(userId, guessName);
+          // Update user name if not set during registration
+          try {
+            if (guessName) {
+              await UserRepository.updateProfile(userId, { name: guessName });
+            }
+          } catch (error) {
+            logger.warn({ userId, error }, 'Could not update user name after registration');
+          }
           await LoginEventRepository.markProcessed(messageId, routingKey);
           break;
         }
         case 'user.logged_in': {
           await LoginEventRepository.recordLogin(event);
-          if (event.userId) await ProfileRepository.setLastLogin(event.userId);
+          if (event.userId) {
+            try {
+              await UserRepository.updateLastLogin(event.userId);
+            } catch (error) {
+              logger.warn({ userId: event.userId, error }, 'Could not update last login');
+            }
+          }
           await LoginEventRepository.markProcessed(messageId, routingKey);
           break;
         }

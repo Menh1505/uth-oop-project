@@ -1,35 +1,28 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
-import { NewUserController } from '../controllers/UserController';
+import { UserController } from '../controllers/UserController';
 
 const router = Router();
 
-// Health check
-router.get('/status', NewUserController.status);
-
-// Authentication routes (no auth required)
-router.post('/register', NewUserController.register);
-router.post('/login', NewUserController.login);
-
 // User profile routes (auth required)
-router.get('/me', authenticate, NewUserController.getMe);
-router.put('/me', authenticate, NewUserController.updateMe);
-router.put('/avatar', authenticate, NewUserController.uploadAvatar);
+router.get('/me', authenticate, UserController.getMe);
+router.put('/me', authenticate, UserController.updateMe);
+router.put('/avatar', authenticate, UserController.uploadAvatar);
 
 // Onboarding routes (auth required)
-router.post('/onboarding', authenticate, NewUserController.completeOnboarding);
+router.post('/onboarding', authenticate, UserController.completeOnboarding);
 
 // Goals routes (auth required)
-router.get('/goals/available', authenticate, NewUserController.getAvailableGoals);
-router.get('/goals', authenticate, NewUserController.getUserGoals);
-router.post('/goals', authenticate, NewUserController.assignGoal);
-router.put('/goals/:goalId', authenticate, NewUserController.updateGoalProgress);
-router.delete('/goals/:goalId', authenticate, NewUserController.removeGoal);
+router.get('/goals/available', authenticate, UserController.getAvailableGoals);
+router.get('/goals', authenticate, UserController.getUserGoals);
+router.post('/goals', authenticate, UserController.assignGoal);
+router.put('/goals/:goalId', authenticate, UserController.updateGoalProgress);
+router.delete('/goals/:goalId', authenticate, UserController.removeGoal);
 
 // Dashboard routes (auth required)
-router.get('/dashboard', authenticate, NewUserController.getDashboard);
+router.get('/dashboard', authenticate, UserController.getDashboard);
 
 // Admin routes (auth + admin role required)
-router.get('/admin/users', authenticate, NewUserController.listUsers);
+router.get('/admin/users', authenticate, UserController.listUsers);
 
 export default router;

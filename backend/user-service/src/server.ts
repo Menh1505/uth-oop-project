@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import userRoutes from './routes/UserRoutes';
-import newUserRoutes from './routes/UserRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { MessageConsumer } from './services/messageConsumer';
 import logger from './config/logger';
@@ -31,9 +30,16 @@ app.get('/health', (req, res) => {
   res.json(healthData);
 });
 
+// Import controller for root auth routes
+import { UserController } from './controllers/UserController';
+
+// Authentication routes at root level for compatibility
+app.post('/register', UserController.register);
+app.post('/login', UserController.login);
+app.get('/status', UserController.status);
+
 // Routes
-app.use('/users', newUserRoutes); // New user management routes
-app.use('/', userRoutes); // Legacy routes for backward compatibility
+app.use('/users', userRoutes); // User management routes
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
