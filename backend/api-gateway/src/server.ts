@@ -3,8 +3,13 @@
 import 'dotenv/config';
 import { APIGateway } from './gateway';
 import { defaultConfig } from './config';
+import { testConfig } from './test-config';
 
-const gateway = new APIGateway(defaultConfig);
+// Use test config if NODE_ENV is development or test
+const isTestEnv = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+const config = isTestEnv ? testConfig : defaultConfig;
+
+const gateway = new APIGateway(config);
 
 // Handle graceful shutdown
 const gracefulShutdown = async (signal: string) => {

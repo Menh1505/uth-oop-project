@@ -16,10 +16,7 @@ app.use((req: express.Request, res: express.Response, next: express.NextFunction
 app.use(cors());
 app.use(express.json());
 
-// Routes
-app.use('/', userRoutes);
-
-// Health check endpoint
+// Health check endpoint (must be before authenticated routes)
 app.get('/health', (req, res) => {
   const status = MessageConsumer['connection'] ? 'OK' : 'WARNING';
   const healthData = {
@@ -32,6 +29,9 @@ app.get('/health', (req, res) => {
   logger.info(healthData, 'Health check');
   res.json(healthData);
 });
+
+// Routes
+app.use('/', userRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

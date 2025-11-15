@@ -75,10 +75,7 @@ services:
       - REDIS_DB=0
       - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:8080
       - CORS_CREDENTIALS=true
-      - CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
-      - CIRCUIT_BREAKER_RESET_TIMEOUT=60000
       - PROMETHEUS_ENABLED=true
-      - RATE_LIMIT_GLOBAL=1000
     depends_on:
       redis:
         condition: service_healthy
