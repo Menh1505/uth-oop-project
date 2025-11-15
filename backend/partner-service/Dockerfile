@@ -12,8 +12,8 @@ RUN adduser -S partner -u 1001
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install all dependencies (including dev for TypeScript compilation)
+RUN npm ci
 
 # Copy source code
 COPY src/ ./src/

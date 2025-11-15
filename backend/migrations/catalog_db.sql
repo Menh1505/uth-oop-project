@@ -1,7 +1,6 @@
 -- Create catalog database migration
-CREATE DATABASE catalog_db;
-
-\c catalog_db;
+-- CREATE DATABASE catalog_db;  -- Database created by init script
+-- \c catalog_db;
 
 -- Create categories table
 CREATE TABLE categories (

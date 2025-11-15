@@ -1,7 +1,6 @@
 -- Create workout database migration
-CREATE DATABASE workout_db;
-
-\c workout_db;
+-- CREATE DATABASE workout_db;  -- Database created by init script
+-- \c workout_db;
 
 -- Create workout_plans table
 CREATE TABLE workout_plans (
