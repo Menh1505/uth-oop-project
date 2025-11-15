@@ -49,9 +49,9 @@ export const defaultConfig: GatewayConfig = {
       circuitBreakerEnabled: true,
     },
     {
-      name: 'admin-service',
+      name: 'meal-service',
       instances: [
-        { host: 'admin-service', port: 3003, weight: 1, healthy: true }
+        { host: 'meal-service', port: 3004, weight: 1, healthy: true }
       ],
       healthPath: '/health',
       timeout: 30000,
@@ -59,89 +59,9 @@ export const defaultConfig: GatewayConfig = {
       circuitBreakerEnabled: true,
     },
     {
-      name: 'catalog-service',
+      name: 'exercise-service',
       instances: [
-        { host: 'catalog-service', port: 3003, weight: 1, healthy: true }
-      ],
-      healthPath: '/health',
-      timeout: 30000,
-      retryAttempts: 3,
-      circuitBreakerEnabled: true,
-    },
-    {
-      name: 'workout-service',
-      instances: [
-        { host: 'workout-service', port: 3004, weight: 1, healthy: true }
-      ],
-      healthPath: '/health',
-      timeout: 30000,
-      retryAttempts: 3,
-      circuitBreakerEnabled: true,
-    },
-    {
-      name: 'nutrition-service',
-      instances: [
-        { host: 'nutrition-service', port: 3003, weight: 1, healthy: true }
-      ],
-      healthPath: '/health',
-      timeout: 30000,
-      retryAttempts: 3,
-      circuitBreakerEnabled: true,
-    },
-    {
-      name: 'order-service',
-      instances: [
-        { host: 'order-service', port: 3004, weight: 1, healthy: true }
-      ],
-      healthPath: '/health',
-      timeout: 30000,
-      retryAttempts: 3,
-      circuitBreakerEnabled: true,
-    },
-    {
-      name: 'payment-service',
-      instances: [
-        { host: 'payment-service', port: 3003, weight: 1, healthy: true }
-      ],
-      healthPath: '/health',
-      timeout: 30000,
-      retryAttempts: 3,
-      circuitBreakerEnabled: true,
-    },
-    {
-      name: 'partner-service',
-      instances: [
-        { host: 'partner-service', port: 3004, weight: 1, healthy: true }
-      ],
-      healthPath: '/health',
-      timeout: 30000,
-      retryAttempts: 3,
-      circuitBreakerEnabled: true,
-    },
-    {
-      name: 'delivery-service',
-      instances: [
-        { host: 'delivery-service', port: 3004, weight: 1, healthy: true }
-      ],
-      healthPath: '/health',
-      timeout: 30000,
-      retryAttempts: 3,
-      circuitBreakerEnabled: true,
-    },
-    {
-      name: 'notification-service',
-      instances: [
-        { host: 'notification-service', port: 3010, weight: 1, healthy: true }
-      ],
-      healthPath: '/health',
-      timeout: 30000,
-      retryAttempts: 3,
-      circuitBreakerEnabled: true,
-    },
-    {
-      name: 'recommendation-service',
-      instances: [
-        { host: 'recommendation-service', port: 3011, weight: 1, healthy: true }
+        { host: 'exercise-service', port: 3005, weight: 1, healthy: true }
       ],
       healthPath: '/health',
       timeout: 30000,
@@ -176,54 +96,41 @@ export const defaultConfig: GatewayConfig = {
       authRequired: true,
       stripPath: true,
     },
-    // Admin routes
+    // Meal management routes
     {
-      path: '/api/admin',
-      service: 'admin-service',
+      path: '/api/meals',
+      service: 'meal-service',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       rateLimitConfig: {
-        max: 30,
+        max: 50,
         timeWindow: '1 minute',
         keyGenerator: 'ip'
       },
       authRequired: true,
       stripPath: true,
     },
-    // Catalog routes with high throughput
+    // Food management routes
     {
-      path: '/api/catalog',
-      service: 'catalog-service',
+      path: '/api/foods',
+      service: 'meal-service',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       rateLimitConfig: {
         max: 100,
         timeWindow: '1 minute',
         keyGenerator: 'ip'
       },
-      authRequired: false,
+      authRequired: true,
       stripPath: true,
       cacheConfig: {
         enabled: true,
-        ttl: 300, // 5 minutes cache for catalog data
+        ttl: 300, // 5 minutes cache for food data
         varyByHeaders: ['Accept-Language'],
       },
     },
-    // Workout routes
-    {
-      path: '/api/workouts',
-      service: 'workout-service',
-      methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      rateLimitConfig: {
-        max: 50,
-        timeWindow: '1 minute',
-        keyGenerator: 'ip'
-      },
-      authRequired: true,
-      stripPath: true,
-    },
-    // Nutrition routes
+    // Nutrition analysis routes
     {
       path: '/api/nutrition',
-      service: 'nutrition-service',
+      service: 'meal-service',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       rateLimitConfig: {
         max: 50,
@@ -233,36 +140,10 @@ export const defaultConfig: GatewayConfig = {
       authRequired: true,
       stripPath: true,
     },
-    // Recommendation routes
+    // Exercise management routes
     {
-      path: '/api/recommendations',
-      service: 'recommendation-service',
-      methods: ['GET', 'POST'],
-      rateLimitConfig: {
-        max: 30,
-        timeWindow: '1 minute',
-        keyGenerator: 'ip'
-      },
-      authRequired: true,
-      stripPath: false, // Keep the /api prefix for this service
-    },
-    // Order routes with high throughput
-    {
-      path: '/api/orders',
-      service: 'order-service',
-      methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      rateLimitConfig: {
-        max: 100,
-        timeWindow: '1 minute',
-        keyGenerator: 'ip'
-      },
-      authRequired: true,
-      stripPath: true,
-    },
-    // Payment routes
-    {
-      path: '/api/payments',
-      service: 'payment-service',
+      path: '/api/exercises',
+      service: 'exercise-service',
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       rateLimitConfig: {
         max: 50,
@@ -271,64 +152,6 @@ export const defaultConfig: GatewayConfig = {
       },
       authRequired: true,
       stripPath: true,
-    },
-    // Partner routes
-    {
-      path: '/api/partners',
-      service: 'partner-service',
-      methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      rateLimitConfig: {
-        max: 30,
-        timeWindow: '1 minute',
-        keyGenerator: 'ip'
-      },
-      authRequired: true,
-      stripPath: true,
-    },
-    // Delivery routes with high throughput and WebSocket support
-    {
-      path: '/api/deliveries',
-      service: 'delivery-service',
-      methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      rateLimitConfig: {
-        max: 100,
-        timeWindow: '1 minute',
-        keyGenerator: 'ip'
-      },
-      authRequired: true,
-      stripPath: true,
-      websocketEnabled: true,
-    },
-    // WebSocket route for delivery tracking
-    {
-      path: '/ws/delivery',
-      service: 'delivery-service',
-      methods: ['GET'],
-      authRequired: true,
-      stripPath: false,
-      websocketEnabled: true,
-    },
-    // Notification routes
-    {
-      path: '/api/notifications',
-      service: 'notification-service',
-      methods: ['GET', 'POST', 'PUT', 'DELETE'],
-      rateLimitConfig: {
-        max: 50,
-        timeWindow: '1 minute',
-        keyGenerator: 'ip'
-      },
-      authRequired: true,
-      stripPath: false, // Keep the /api prefix for this service
-    },
-    // WebSocket route for notifications
-    {
-      path: '/ws/notifications',
-      service: 'notification-service',
-      methods: ['GET'],
-      authRequired: true,
-      stripPath: false,
-      websocketEnabled: true,
     },
   ],
   security: {
