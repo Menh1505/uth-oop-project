@@ -12,6 +12,7 @@ export type Store = {
   signIn(): void;
   signOut(): void;
   completeOnboarding(p: UserProfile): void;
+  updateProfile(updates: Partial<UserProfile>): Promise<void>;
   login(username: string, password: string): Promise<void>;
   adminLogin(username: string, password: string): Promise<void>;
   loginError: string | null;
@@ -106,31 +107,80 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = () => setAuthed(true);
   const signOut = async () => {
-    const token = localStorage.getItem('authToken');
-    console.log('Bắt đầu logout , xóa token : ' + token);
-    if (token) {
+    const accessToken = localStorage.getItem('authToken');
+    const refreshToken = localStorage.getItem('refreshToken');
+    
+    if (accessToken) {
       try {
-        await fetch('/api/auth/logout', {
+        const response = await fetch('/api/auth/logout', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            refresh_token: refreshToken
+          }),
+          credentials: 'include' // Send cookies if any
         });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ message: 'Logout failed' }));
+          console.warn('Logout API returned error:', error);
+        } else {
+          const result = await response.json();
+          console.info('Logout successful', {
+            sessionsDeleted: result.sessionsDeleted,
+            tokensRevoked: result.tokensRevoked
+          });
+        }
       } catch (error) {
         console.error('Logout API error:', error);
-        // Still proceed with local logout even if API fails
+        // Continue with local cleanup even if API fails
       }
     }
-    console.log('Logout API thành công');
+
+    // Clear all local state and storage
     setAuthed(false);
     setProfile(null);
-    localStorage.removeItem('authToken');
     setMeals([]);
     setWorkouts([]);
     setCart([]);
     setOrder(null);
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userProfile');
   };
   const completeOnboarding = (p: UserProfile) => setProfile(p);
+
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (!profile) throw new Error('No profile to update');
+    const token = localStorage.getItem('authToken');
+    if (!token) throw new Error('No auth token');
+
+    try {
+      const response = await fetch('/api/users/me', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
+      }
+
+      const updatedData = await response.json();
+      setProfile(prev => prev ? { ...prev, ...updates } : null);
+      return updatedData;
+    } catch (error) {
+      console.error('Profile update error:', error);
+      throw error;
+    }
+  };
 
   const login = async (username: string, password: string) => {
     setLoginLoading(true);
@@ -145,19 +195,60 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       });
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('authToken', data.token);
+        
+        // Store tokens securely
+        localStorage.setItem('authToken', data.access_token);
+        if (data.refresh_token) {
+          localStorage.setItem('refreshToken', data.refresh_token);
+        }
         setAuthed(true);
-        // Set basic profile - in production, fetch from /api/user/profile
-        setProfile({
-          name: username,
-          goal: 'maintain',
-          diet: 'balanced',
-          budgetPerMeal: 50000,
-          timePerWorkout: 60,
-          username,
-          role: 'user',
-          needsOnboarding: true
-        });
+        
+        // Now fetch user profile from /api/users/me
+        try {
+          const profileResponse = await fetch('/api/users/me', {
+            headers: {
+              'Authorization': `Bearer ${data.access_token}`,
+            },
+          });
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json();
+            setProfile({
+              name: profileData.profile?.full_name || username,
+              goal: 'maintain',
+              diet: 'balanced',
+              budgetPerMeal: 50000,
+              timePerWorkout: 60,
+              username,
+              role: 'user',
+              needsOnboarding: profileData.onboarding === true
+            });
+          } else {
+            // Profile endpoint failed, set default with onboarding
+            setProfile({
+              name: username,
+              goal: 'maintain',
+              diet: 'balanced',
+              budgetPerMeal: 50000,
+              timePerWorkout: 60,
+              username,
+              role: 'user',
+              needsOnboarding: true
+            });
+          }
+        } catch (profileError) {
+          console.error('Profile fetch error:', profileError);
+          // Still logged in, but needs onboarding
+          setProfile({
+            name: username,
+            goal: 'maintain',
+            diet: 'balanced',
+            budgetPerMeal: 50000,
+            timePerWorkout: 60,
+            username,
+            role: 'user',
+            needsOnboarding: true
+          });
+        }
         setLoginError(null);
       } else {
         const errorData = await response.json();
@@ -184,9 +275,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       });
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('authToken', data.access_token);
         setAuthed(true);
-        // Set admin profile
+        // Set admin profile (admins don't need onboarding)
         setProfile({
           name: username,
           goal: 'maintain',
@@ -195,7 +286,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           timePerWorkout: 60,
           username,
           role: 'admin',
-          needsOnboarding: false // Admins don't need onboarding
+          needsOnboarding: false
         });
         setLoginError(null);
       } else {
@@ -301,7 +392,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   }, [order?.id]);
 
   const value: Store = {
-    authed, loading, profile, signIn, signOut, completeOnboarding, login, adminLogin, loginError, loginLoading, register, registerError, registerLoading, registerSuccess,
+    authed, loading, profile, signIn, signOut, completeOnboarding, updateProfile, login, adminLogin, loginError, loginLoading, register, registerError, registerLoading, registerSuccess,
     meals, workouts, addMeal, addWorkout,
     cart, addToCart, changeQty, cartTotal, clearCart,
     order, startCheckout, cancelOrder,
