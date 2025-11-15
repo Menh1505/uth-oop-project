@@ -1,3 +1,6 @@
+# Updated Docker Compose Configuration
+# This replaces NGINX with the custom API Gateway
+
 version: '3.8'
 
 services:
@@ -15,6 +18,18 @@ services:
     networks:
       - backend
 
+  # Redis for API Gateway (rate limiting, caching)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
@@ -27,6 +42,48 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - backend
+
+  # Custom API Gateway (replaces NGINX)
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:8080"  # External port 3000 -> Gateway port 8080
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+      - GATEWAY_PORT=8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:8080
+      - CORS_CREDENTIALS=true
+      - CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+      - CIRCUIT_BREAKER_RESET_TIMEOUT=60000
+      - PROMETHEUS_ENABLED=true
+      - RATE_LIMIT_GLOBAL=1000
+    depends_on:
+      - redis
+      - auth-service
+      - user-service
+      - admin-service
+      - catalog-service
+      - workout-service
+      - nutrition-service
+      - order-service
+      - payment-service
+      - partner-service
+      - delivery-service
+      - notification-service
+      - recommendation-service
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Observability Stack
   prometheus:
@@ -70,29 +127,7 @@ services:
     networks:
       - backend
 
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "3000:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-    depends_on:
-      - auth-service
-      # - user-service
-      - admin-service
-      - catalog-service
-      - workout-service
-      - nutrition-service
-      - order-service
-      - payment-service
-      - partner-service
-      - delivery-service
-      - notification-service
-      - recommendation-service
-    networks:
-      - backend
-    restart: unless-stopped
-
+  # Microservices (keeping existing configuration)
   auth-service:
     build: ./auth-service
     ports:
@@ -352,5 +387,6 @@ networks:
 volumes:
   postgres_data:
   rabbitmq_data:
+  redis_data:      # New volume for Redis
   prometheus_data:
   grafana_data:
