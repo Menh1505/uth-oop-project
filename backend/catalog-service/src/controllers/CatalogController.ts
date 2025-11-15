@@ -51,7 +51,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       data: product
     });
@@ -79,7 +79,7 @@ export class CatalogController {
     
     const product = await this.catalogService.createProduct(productData);
     
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: product,
       message: 'Product created successfully'
@@ -108,7 +108,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       data: product,
       message: 'Product updated successfully'
@@ -128,7 +128,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Product deleted successfully'
     });
@@ -157,7 +157,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       data: category
     });
@@ -176,7 +176,7 @@ export class CatalogController {
     
     const category = await this.catalogService.createCategory(categoryData);
     
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: category,
       message: 'Category created successfully'
@@ -197,7 +197,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       data: category,
       message: 'Category updated successfully'
@@ -217,7 +217,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Category deleted successfully'
     });
@@ -237,7 +237,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       data: inventory
     });
@@ -273,7 +273,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       data: inventory,
       message: 'Inventory updated successfully'
@@ -320,7 +320,7 @@ export class CatalogController {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Inventory reserved successfully',
       data: { reservations }

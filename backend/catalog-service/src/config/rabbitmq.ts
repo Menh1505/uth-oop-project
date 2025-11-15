@@ -1,13 +1,34 @@
-import amqp from 'amqplib';
+import * as amqp from 'amqplib';
+
+interface AmqpConnection {
+  createChannel(): Promise<AmqpChannel>;
+  close(): Promise<void>;
+}
+
+interface AmqpChannel {
+  assertExchange(exchange: string, type: string, options?: any): Promise<any>;
+  assertQueue(queue: string, options?: any): Promise<any>;
+  publish(exchange: string, routingKey: string, content: Buffer, options?: any): boolean;
+  close(): Promise<void>;
+}
 
 class RabbitMQService {
-  private connection: amqp.Connection | null = null;
-  private channel: amqp.Channel | null = null;
+  private connection: AmqpConnection | null = null;
+  private channel: AmqpChannel | null = null;
 
   async connect(): Promise<void> {
     try {
-      this.connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost:5672');
+      this.connection = (await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost:5672')) as AmqpConnection;
+      
+      if (!this.connection) {
+        throw new Error('Failed to establish connection');
+      }
+      
       this.channel = await this.connection.createChannel();
+      
+      if (!this.channel) {
+        throw new Error('Failed to create channel');
+      }
       
       // Declare exchanges and queues
       await this.channel.assertExchange('catalog.events', 'topic', { durable: true });
