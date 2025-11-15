@@ -32,10 +32,4 @@ router.get('/dashboard', authenticate, NewUserController.getDashboard);
 // Admin routes (auth + admin role required)
 router.get('/admin/users', authenticate, NewUserController.listUsers);
 
-// Legacy routes for backwards compatibility
-router.get('/me-legacy', authenticate, NewUserController.legacyGetMe);
-router.put('/me-legacy', authenticate, NewUserController.legacyUpdateMe);
-router.put('/avatar-legacy', authenticate, NewUserController.legacyUploadAvatar);
-router.get('/admin/users-legacy', authenticate, NewUserController.legacyListUsers);
-
 export default router;

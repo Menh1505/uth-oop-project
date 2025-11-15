@@ -10,7 +10,7 @@ import {
   UpdateUserGoalPayload
 } from '../models/User';
 
-export class NewUserService {
+export class UserService {
   // Register new user
   static async registerUser(userData: RegisterUserPayload): Promise<UserResponse> {
     // Check if email already exists

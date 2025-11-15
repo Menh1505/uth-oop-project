@@ -423,25 +423,4 @@ export class NewUserController {
       });
     }
   }
-
-  // Legacy support - delegate to old UserController
-  static async legacyGetMe(req: AuthRequest, res: Response) {
-    const { UserController } = await import('./UserController');
-    return UserController.getMe(req, res);
-  }
-
-  static async legacyUpdateMe(req: AuthRequest, res: Response) {
-    const { UserController } = await import('./UserController');
-    return UserController.updateMe(req, res);
-  }
-
-  static async legacyUploadAvatar(req: AuthRequest, res: Response) {
-    const { UserController } = await import('./UserController');
-    return UserController.uploadAvatar(req, res);
-  }
-
-  static async legacyListUsers(req: AuthRequest, res: Response) {
-    const { UserController } = await import('./UserController');
-    return UserController.listUsers(req, res);
-  }
 }
