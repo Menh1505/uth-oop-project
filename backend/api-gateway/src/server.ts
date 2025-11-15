@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 import 'dotenv/config';
-import { SimpleAPIGateway } from './gateway';
+import { APIGateway } from './gateway';
 import { defaultConfig } from './config';
 
-const gateway = new SimpleAPIGateway(defaultConfig);
+const gateway = new APIGateway(defaultConfig);
 
 // Handle graceful shutdown
 const gracefulShutdown = async (signal: string) => {

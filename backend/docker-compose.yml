@@ -1,14 +1,15 @@
-# Updated Docker Compose Configuration
-# This replaces NGINX with the custom API Gateway
+# Docker Compose cho Testing API Gateway
+# Chỉ bao gồm các service cần thiết: API Gateway, Observability, Auth và User services
 
 version: '3.8'
 
 services:
+  # Database PostgreSQL
   postgres:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_PASSWORD: uth
     ports:
       - "5432:5432"
     volumes:
@@ -17,8 +18,13 @@ services:
       - ./migrations:/migrations:ro
     networks:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Redis for API Gateway (rate limiting, caching)
+  # Redis cho API Gateway (rate limiting, caching)
   redis:
     image: redis:7-alpine
     ports:
@@ -29,12 +35,18 @@ services:
       - backend
     command: redis-server --appendonly yes
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # RabbitMQ cho messaging
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
       - "5672:5672"
-      - "15672:15672"
+      - "15672:15672"  # Management UI
     environment:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
@@ -42,14 +54,19 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
 
-  # Custom API Gateway (replaces NGINX)
+  # Custom API Gateway (thay thế NGINX)
   api-gateway:
     build: ./api-gateway
     ports:
       - "3000:8080"  # External port 3000 -> Gateway port 8080
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - LOG_LEVEL=info
       - GATEWAY_PORT=8080
       - REDIS_HOST=redis
@@ -62,19 +79,12 @@ services:
       - PROMETHEUS_ENABLED=true
       - RATE_LIMIT_GLOBAL=1000
     depends_on:
-      - redis
-      - auth-service
-      - user-service
-      - admin-service
-      - catalog-service
-      - workout-service
-      - nutrition-service
-      - order-service
-      - payment-service
-      - partner-service
-      - delivery-service
-      - notification-service
-      - recommendation-service
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
     networks:
       - backend
     restart: unless-stopped
@@ -84,6 +94,64 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # Auth Service
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "3011:3001"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/auth_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: auth_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # User Service  
+  user-service:
+    build: ./user-service
+    ports:
+      - "3012:3002"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/user_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_NAME: user_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Observability Stack
   prometheus:
@@ -100,8 +168,14 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+      - '--log.level=info'
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   grafana:
     image: grafana/grafana:latest
@@ -110,275 +184,36 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: false
+      GF_INSTALL_PLUGINS: ""
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
-      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./observability/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - backend
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
-      - "16686:16686"
-      - "14268:14268"
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"  # Jaeger Collector
     environment:
       COLLECTOR_OTLP_ENABLED: true
+      JAEGER_DISABLED: false
     networks:
       - backend
-
-  # Microservices (keeping existing configuration)
-  auth-service:
-    build: ./auth-service
-    ports:
-      - "3011:3001"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/auth_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: auth_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-    depends_on:
-      - postgres
-      - rabbitmq
-    networks:
-      - backend
-
-  user-service:
-    build: ./user-service
-    ports:
-      - "3012:3002"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/user_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: user_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-    depends_on:
-      - postgres
-      - rabbitmq
-    networks:
-      - backend
-
-  admin-service:
-    build: ./admin-service
-    ports:
-      - "3013:3003"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/admin_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: admin_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-    depends_on:
-      - postgres
-    networks:
-      - backend
-
-  catalog-service:
-    build: ./catalog-service
-    ports:
-      - "3014:3003"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/catalog_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: catalog_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-      PROMETHEUS_PORT: 9464
-    depends_on:
-      - postgres
-      - rabbitmq
-      - prometheus
-      - jaeger
-    networks:
-      - backend
-
-  workout-service:
-    build: ./workout-service
-    ports:
-      - "3015:3004"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/workout_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: workout_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-    depends_on:
-      - postgres
-    networks:
-      - backend
-
-  nutrition-service:
-    build: ./nutrition-service
-    ports:
-      - "3016:3003"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/nutrition_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: nutrition_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-    depends_on:
-      - postgres
-    networks:
-      - backend
-
-  order-service:
-    build: ./order-service
-    ports:
-      - "3017:3004"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/order_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: order_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-    depends_on:
-      - postgres
-    networks:
-      - backend
-
-  payment-service:
-    build: ./payment-service
-    ports:
-      - "3018:3003"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/payment_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: payment_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-      NODE_ENV: production
-      # Apple Pay Configuration
-      APPLE_PAY_MERCHANT_ID: merchant.uth.foodorder
-      APPLE_PAY_PROCESSING_CERTIFICATE_PATH: /app/certs/apple-pay-processing.p12
-      APPLE_PAY_PROCESSING_CERTIFICATE_PASSWORD: your-cert-password
-      # PayOS Configuration
-      PAYOS_CLIENT_ID: your-payos-client-id
-      PAYOS_API_KEY: your-payos-api-key
-      PAYOS_CHECKSUM_KEY: your-payos-checksum-key
-      PAYOS_RETURN_URL: http://localhost:3000/payment/success
-      PAYOS_CANCEL_URL: http://localhost:3000/payment/cancel
-      # Mock Gateway Configuration
-      MOCK_GATEWAY_SUCCESS_RATE: 0.9
-      MOCK_GATEWAY_PROCESS_TIME: 2000
-    depends_on:
-      - postgres
-    networks:
-      - backend
-
-  partner-service:
-    build: ./partner-service
-    ports:
-      - "3019:3004"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/partner_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: partner_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-      NODE_ENV: production
-    depends_on:
-      - postgres
-    networks:
-      - backend
-
-  delivery-service:
-    build: ./delivery-service
-    ports:
-      - "3020:3004"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres_password@postgres:5432/delivery_db
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres_password
-      DB_NAME: delivery_db
-      DB_PORT: 5432
-      JWT_SECRET: shared-jwt-secret-key-12345
-      NODE_ENV: production
-      # Service URLs for integration
-      AUTH_SERVICE_URL: http://auth-service:3001
-      ORDER_SERVICE_URL: http://order-service:3004
-      PARTNER_SERVICE_URL: http://partner-service:3004
-      PAYMENT_SERVICE_URL: http://payment-service:3003
-      # CORS Configuration
-      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:8080
-      # Rate Limiting
-      RATE_LIMIT_WINDOW: 900000
-      RATE_LIMIT_MAX: 100
-      # File Upload
-      JSON_LIMIT: 10mb
-      URL_ENCODED_LIMIT: 10mb
-      # Frontend URL for WebSocket CORS
-      FRONTEND_URL: http://localhost:3000
-    depends_on:
-      - postgres
-      - auth-service
-      - order-service
-      - partner-service
-      - payment-service
-    networks:
-      - backend
-
-  notification-service:
-    build: ./notification-service
-    ports:
-      - "3021:3010"
-    environment:
-      NODE_ENV: production
-      PORT: 3010
-      JWT_SECRET: shared-jwt-secret-key-12345
-      ENABLE_EMAIL: true
-      ENABLE_SMS: true
-      ENABLE_PUSH: true
-      MOCK_PROVIDER_LOG_FILE: ./notifications.log
-    networks:
-      - backend
-
-  recommendation-service:
-    build: ./recommendation-service
-    ports:
-      - "3022:3011"
-    environment:
-      NODE_ENV: production
-      PORT: 3011
-      OPENAI_API_KEY: your_openai_api_key_here
-      OPENAI_MODEL: gpt-3.5-turbo
-      OPENAI_MAX_TOKENS: 500
-      OPENAI_TEMPERATURE: 0.7
-      ENABLE_AI_RECOMMENDATIONS: true
-      ENABLE_FALLBACK_RECOMMENDATIONS: true
-      CACHE_RECOMMENDATIONS: true
-      RECOMMENDATION_CACHE_TTL: 3600
-      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001
-      RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 100
-      LOG_LEVEL: info
-    networks:
-      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:14269/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   backend:
@@ -387,6 +222,6 @@ networks:
 volumes:
   postgres_data:
   rabbitmq_data:
-  redis_data:      # New volume for Redis
+  redis_data:
   prometheus_data:
   grafana_data:

@@ -6,7 +6,7 @@ import { CircuitBreakerManager } from './core/circuit-breaker';
 import { HealthChecker } from './core/health-checker';
 import { v4 as uuidv4 } from 'uuid';
 
-export class SimpleAPIGateway {
+export class APIGateway {
   private app: FastifyInstance;
   private config: GatewayConfig;
   private loadBalancer: LoadBalancer;
@@ -258,7 +258,7 @@ export class SimpleAPIGateway {
         host: this.config.server.host
       });
 
-      this.app.log.info(`API Gateway started on ${address}`);
+      // this.app.log.info(`API Gateway started on ${address}`);
       // this.app.log.info(`Health check endpoint: /health`);
       // this.app.log.info(`Configured routes: ${this.config.routes.length}`);
       // this.app.log.info(`Configured services: ${this.config.services.length}`);
