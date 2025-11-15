@@ -84,6 +84,8 @@ services:
         condition: service_healthy
       goal-service:
         condition: service_healthy
+      recommendation-service:
+        condition: service_healthy
     networks:
       - backend
     restart: unless-stopped
@@ -237,6 +239,35 @@ services:
       - backend
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Recommendation Service (AI-powered)
+  recommendation-service:
+    build: ./recommendation-service
+    ports:
+      - "3017:3007"
+    environment:
+      DATABASE_URL: postgresql://postgres:uth@postgres:5432/fitfood_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitfood_db
+      DB_PORT: 5432
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      NODE_ENV: development
+      PORT: 3007
+      LOG_LEVEL: info
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/health"]
       interval: 30s
       timeout: 10s
       retries: 3

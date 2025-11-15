@@ -78,6 +78,16 @@ export const defaultConfig: GatewayConfig = {
       retryAttempts: 3,
       circuitBreakerEnabled: true,
     },
+    {
+      name: 'recommendation-service',
+      instances: [
+        { host: 'recommendation-service', port: 3007, weight: 1, healthy: true }
+      ],
+      healthPath: '/health',
+      timeout: 45000, // Higher timeout for AI recommendations
+      retryAttempts: 2,
+      circuitBreakerEnabled: true,
+    },
   ],
   routes: [
     // Authentication routes with stricter rate limiting
@@ -171,6 +181,19 @@ export const defaultConfig: GatewayConfig = {
       rateLimitConfig: {
         max: 50,
         timeWindow: '1 minute',
+        keyGenerator: 'ip'
+      },
+      authRequired: true,
+      stripPath: true,
+    },
+    // AI Recommendation routes
+    {
+      path: '/api/recommendations',
+      service: 'recommendation-service',
+      methods: ['GET', 'POST'],
+      rateLimitConfig: {
+        max: 10, // More restrictive due to AI API costs
+        timeWindow: '5 minutes',
         keyGenerator: 'ip'
       },
       authRequired: true,
