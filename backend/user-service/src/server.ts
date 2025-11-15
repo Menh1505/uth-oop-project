@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import userRoutes from './routes/userRoutes';
+import newUserRoutes from './routes/UserRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { MessageConsumer } from './services/messageConsumer';
 import logger from './config/logger';
@@ -31,7 +32,8 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/', userRoutes);
+app.use('/users', newUserRoutes); // New user management routes
+app.use('/', userRoutes); // Legacy routes for backward compatibility
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

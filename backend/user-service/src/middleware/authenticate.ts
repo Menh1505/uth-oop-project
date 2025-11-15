@@ -5,6 +5,8 @@ import { JwtClaims } from '../models/User';
 
 export interface AuthRequest extends Request {
   user?: JwtClaims;
+  body: any;
+  params: any;
 }
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
