@@ -9,11 +9,13 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
-      uth: uth
+      POSTGRES_PASSWORD: uth
+      POSTGRES_DB: postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
       - ./migrations:/migrations:ro
     networks:
       - backend
@@ -71,7 +73,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:8080
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:8080
       - CORS_CREDENTIALS=true
       - CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
       - CIRCUIT_BREAKER_RESET_TIMEOUT=60000
