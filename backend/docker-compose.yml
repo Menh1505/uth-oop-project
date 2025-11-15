@@ -86,6 +86,8 @@ services:
         condition: service_healthy
       recommendation-service:
         condition: service_healthy
+      payment-service:
+        condition: service_healthy
     networks:
       - backend
     restart: unless-stopped
@@ -257,6 +259,9 @@ services:
       DB_NAME: fitfood_db
       DB_PORT: 5432
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      JWT_SECRET: shared-jwt-secret-key-12345
+      PAYMENT_SERVICE_URL: http://payment-service:3008
+      SUBSCRIPTION_CHECK_FAIL_OPEN: false
       NODE_ENV: development
       PORT: 3007
       LOG_LEVEL: info
@@ -264,10 +269,41 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      payment-service:
+        condition: service_healthy
     networks:
       - backend
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Payment Service (Premium subscription management)
+  payment-service:
+    build: ./payment-service
+    ports:
+      - "3018:3008"
+    environment:
+      DATABASE_URL: postgresql://postgres:uth@postgres:5432/fitfood_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitfood_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      NODE_ENV: development
+      PORT: 3008
+      LOG_LEVEL: info
+      CORS_ORIGIN: http://localhost:3000,http://localhost:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3008/health"]
       interval: 30s
       timeout: 10s
       retries: 3

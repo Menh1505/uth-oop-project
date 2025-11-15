@@ -1,5 +1,7 @@
 import express from 'express';
 import { RecommendationController } from '../controllers/RecommendationController';
+import { checkPremiumSubscription } from '../middleware/premiumCheck';
+import { authenticateToken } from '../middleware/authenticate';
 import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
@@ -16,16 +18,29 @@ const recommendationLimit = rateLimit({
   legacyHeaders: false,
 });
 
-// Health check
+// Health check (public)
 router.get('/health', RecommendationController.health);
 
-// Get personalized recommendation
-router.post('/generate', recommendationLimit, RecommendationController.getRecommendation);
+// Get personalized recommendation (premium only)
+router.post('/generate', 
+  recommendationLimit, 
+  authenticateToken,
+  checkPremiumSubscription,
+  RecommendationController.getRecommendation
+);
 
-// Get daily recommendation
-router.get('/daily/:userId', RecommendationController.getDailyRecommendation);
+// Get daily recommendation (premium only)
+router.get('/daily/:userId', 
+  authenticateToken,
+  checkPremiumSubscription,
+  RecommendationController.getDailyRecommendation
+);
 
-// Get recommendation history
-router.get('/history/:userId', RecommendationController.getRecommendationHistory);
+// Get recommendation history (premium only)
+router.get('/history/:userId', 
+  authenticateToken,
+  checkPremiumSubscription,
+  RecommendationController.getRecommendationHistory
+);
 
 export default router;

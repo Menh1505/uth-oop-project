@@ -88,6 +88,16 @@ export const defaultConfig: GatewayConfig = {
       retryAttempts: 2,
       circuitBreakerEnabled: true,
     },
+    {
+      name: 'payment-service',
+      instances: [
+        { host: 'payment-service', port: 3008, weight: 1, healthy: true }
+      ],
+      healthPath: '/health',
+      timeout: 30000,
+      retryAttempts: 3,
+      circuitBreakerEnabled: true,
+    },
   ],
   routes: [
     // Authentication routes with stricter rate limiting
@@ -197,6 +207,19 @@ export const defaultConfig: GatewayConfig = {
         keyGenerator: 'ip'
       },
       authRequired: true,
+      stripPath: true,
+    },
+    // Payment and subscription routes
+    {
+      path: '/api/payments',
+      service: 'payment-service',
+      methods: ['GET', 'POST', 'DELETE'],
+      rateLimitConfig: {
+        max: 20,
+        timeWindow: '1 minute',
+        keyGenerator: 'ip'
+      },
+      authRequired: false, // Public routes like /plans don't need auth
       stripPath: true,
     },
   ],
