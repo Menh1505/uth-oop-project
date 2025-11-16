@@ -66,7 +66,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   // Check auth on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('authToken');
+      // Ưu tiên authToken (giữ tương thích với flow cũ), fallback sang accessToken cho các lần đăng nhập mới
+      const token = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
       if (!token) {
         setLoading(false);
         return;
@@ -93,10 +94,12 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           });
         } else {
           localStorage.removeItem('authToken');
+          localStorage.removeItem('accessToken');
         }
       } catch (error) {
         console.error('Auth check error:', error);
         localStorage.removeItem('authToken');
+        localStorage.removeItem('accessToken');
       } finally {
         setLoading(false);
       }
@@ -107,7 +110,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = () => setAuthed(true);
   const signOut = async () => {
-    const accessToken = localStorage.getItem('authToken');
+    // Đọc token từ cả hai khóa để đảm bảo hoạt động với mọi phiên đăng nhập
+    const accessToken = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
     const refreshToken = localStorage.getItem('refreshToken');
     
     if (accessToken) {
@@ -148,6 +152,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     setCart([]);
     setOrder(null);
     localStorage.removeItem('authToken');
+    localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userProfile');
   };
@@ -197,7 +202,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         const data = await response.json();
         
         // Store tokens securely
+        // Giữ cả hai khóa để tương thích với ApiClient (accessToken) và logic hiện tại (authToken)
         localStorage.setItem('authToken', data.access_token);
+        localStorage.setItem('accessToken', data.access_token);
         if (data.refresh_token) {
           localStorage.setItem('refreshToken', data.refresh_token);
         }
@@ -275,7 +282,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       });
       if (response.ok) {
         const data = await response.json();
+        // Lưu cả hai khóa để mọi nơi có thể đọc được token
         localStorage.setItem('authToken', data.access_token);
+        localStorage.setItem('accessToken', data.access_token);
         setAuthed(true);
         // Set admin profile (admins don't need onboarding)
         setProfile({

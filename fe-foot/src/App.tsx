@@ -17,6 +17,7 @@ const Analytics = lazy(() => import("./pages/Analytics"));
 const Menu = lazy(() => import("./pages/Menu"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Order = lazy(() => import("./pages/Order"));
+const Profile = lazy(() => import("./pages/Profile"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminRestaurants = lazy(() => import("./pages/admin/Restaurants"));
 const AdminDeliveryPartners = lazy(() => import("./pages/admin/DeliveryPartners"));
@@ -174,6 +175,7 @@ export default function App() {
                 <Route path="/menu" element={<Menu />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order" element={<Order />} />
+                <Route path="/profile" element={<Profile />} />
               </Route>
             </Route>
           </Route>
