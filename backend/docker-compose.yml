@@ -1,5 +1,5 @@
-# Docker Compose cho Testing API Gateway
-# Chỉ bao gồm các service cần thiết: API Gateway, Observability, Auth và User services
+# Docker Compose cho UTH Fitness Backend
+# Bao gồm các service: API Gateway, Auth, User, Meal, Exercise và Observability stack
 
 version: '3.8'
 
@@ -83,6 +83,10 @@ services:
         condition: service_healthy
       user-service:
         condition: service_healthy
+      meal-service:
+        condition: service_healthy
+      exercise-service:
+        condition: service_healthy
     networks:
       - backend
     restart: unless-stopped
@@ -146,6 +150,66 @@ services:
       - backend
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Meal Service  
+  meal-service:
+    build: ./meal-service
+    ports:
+      - "3014:3004"
+    environment:
+      DATABASE_URL: postgresql://postgres:uth@postgres:5432/fitness_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitness_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      NODE_ENV: development
+      PORT: 3004
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Exercise Service  
+  exercise-service:
+    build: ./exercise-service
+    ports:
+      - "3015:3005"
+    environment:
+      DATABASE_URL: postgresql://postgres:uth@postgres:5432/fitness_db
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitness_db
+      DB_PORT: 5432
+      JWT_SECRET: shared-jwt-secret-key-12345
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      NODE_ENV: development
+      PORT: 3005
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3005/health"]
       interval: 30s
       timeout: 10s
       retries: 3
