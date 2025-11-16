@@ -1,81 +1,58 @@
 import { Request, Response, NextFunction } from 'express';
+import logger from '../config/logger';
 
-export interface ErrorResponse {
-  success: false;
-  error: string;
-  message?: string;
+interface ErrorWithStatus extends Error {
+  status?: number;
   statusCode?: number;
-  timestamp?: string;
-  path?: string;
-}
-
-export class AppError extends Error {
-  public statusCode: number;
-  public operational: boolean;
-
-  constructor(message: string, statusCode: number = 500) {
-    super(message);
-    this.statusCode = statusCode;
-    this.operational = true;
-
-    Error.captureStackTrace(this, this.constructor);
-  }
 }
 
 export const errorHandler = (
-  error: Error | AppError,
+  err: ErrorWithStatus,
   req: Request,
   res: Response,
   next: NextFunction
 ): void => {
-  let statusCode = 500;
-  let message = 'Internal server error';
+  // Log error
+  logger.error('Payment Service Error:', {
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
+  });
 
-  if (error instanceof AppError) {
-    statusCode = error.statusCode;
-    message = error.message;
-  } else if (error.name === 'ValidationError') {
-    statusCode = 400;
-    message = 'Validation error';
-  } else if (error.name === 'CastError') {
-    statusCode = 400;
-    message = 'Invalid ID format';
-  } else if (error.name === 'JsonWebTokenError') {
-    statusCode = 401;
+  // Default error
+  let status = err.status || err.statusCode || 500;
+  let message = err.message || 'Internal Server Error';
+
+  // Handle specific error types
+  if (err.name === 'ValidationError') {
+    status = 400;
+    message = 'Validation Error';
+  } else if (err.name === 'UnauthorizedError') {
+    status = 401;
+    message = 'Unauthorized';
+  } else if (err.name === 'JsonWebTokenError') {
+    status = 401;
     message = 'Invalid token';
-  } else if (error.name === 'TokenExpiredError') {
-    statusCode = 401;
+  } else if (err.name === 'TokenExpiredError') {
+    status = 401;
     message = 'Token expired';
   }
 
-  const errorResponse: ErrorResponse = {
+  res.status(status).json({
     success: false,
-    error: message,
-    statusCode,
-    timestamp: new Date().toISOString(),
-    path: req.path
-  };
-
-  // Log error for debugging
-  console.error('Payment Service Error:', {
-    error: error.message,
-    stack: error.stack,
-    url: req.url,
-    method: req.method,
-    timestamp: new Date().toISOString()
+    message,
+    ...(process.env.NODE_ENV === 'development' && { 
+      stack: err.stack,
+      error: err 
+    })
   });
-
-  res.status(statusCode).json(errorResponse);
 };
 
-export const notFoundHandler = (req: Request, res: Response): void => {
-  const errorResponse: ErrorResponse = {
-    success: false,
-    error: 'Route not found',
-    statusCode: 404,
-    timestamp: new Date().toISOString(),
-    path: req.path
-  };
-
-  res.status(404).json(errorResponse);
+export const notFound = (req: Request, res: Response, next: NextFunction): void => {
+  const error = new Error(`Not Found - ${req.originalUrl}`) as ErrorWithStatus;
+  error.status = 404;
+  next(error);
 };
