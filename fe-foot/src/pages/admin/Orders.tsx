@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
+import { ApiClient } from '../../lib/api/client';
 
 interface Order {
   id: string;
@@ -11,24 +12,49 @@ interface Order {
 }
 
 export default function Orders() {
-  const [orders] = useState<Order[]>([
-    {
-      id: '1',
-      customerName: 'Nguyễn Văn A',
-      restaurant: 'Nhà hàng A',
-      amount: 250000,
-      status: 'completed',
-      orderDate: '2025-11-16 12:30',
-    },
-    {
-      id: '2',
-      customerName: 'Trần Thị B',
-      restaurant: 'Nhà hàng B',
-      amount: 180000,
-      status: 'delivering',
-      orderDate: '2025-11-16 14:15',
-    },
-  ]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await ApiClient.get<Order[]>('/orders');
+      setOrders(data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lỗi tải dữ liệu');
+      console.error('Error fetching orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadgeColor = (status: Order['status']) => {
+    const colors: Record<Order['status'], string> = {
+      completed: 'bg-green-100 text-green-700',
+      delivering: 'bg-blue-100 text-blue-700',
+      pending: 'bg-yellow-100 text-yellow-700',
+      confirmed: 'bg-orange-100 text-orange-700',
+      preparing: 'bg-purple-100 text-purple-700',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700';
+  };
+
+  const getStatusLabel = (status: Order['status']) => {
+    const labels: Record<Order['status'], string> = {
+      completed: 'Hoàn thành',
+      delivering: 'Đang giao',
+      pending: 'Chờ xác nhận',
+      confirmed: 'Đã xác nhận',
+      preparing: 'Đang chuẩn bị',
+    };
+    return labels[status] || status;
+  };
 
   return (
     <AdminLayout>
