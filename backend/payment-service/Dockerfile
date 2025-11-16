@@ -1,36 +1,47 @@
-# Payment Service Dockerfile
+# Use Node.js 18 Alpine as base image
 FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Create app user for security
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S payment -u 1001
-
 # Copy package files
 COPY package*.json ./
-COPY tsconfig.json ./
 
-# Install all dependencies (including dev for TypeScript compilation)
+# Install all dependencies (including dev dependencies for building)
 RUN npm ci
 
-# Copy source code
-COPY src/ ./src/
+# Copy TypeScript config and source code
+COPY tsconfig.json ./
+COPY src ./src
 
-# Build the application
+# Install TypeScript globally and build
+RUN npm install -g typescript
 RUN npm run build
 
-# Change ownership to nodejs user
-RUN chown -R payment:nodejs /app
-USER payment
+# Remove dev dependencies to reduce image size
+RUN npm ci --only=production
+
+# Create logs directory
+RUN mkdir -p logs
 
 # Expose port
-EXPOSE 3003
+EXPOSE 3008
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S payment-service -u 1001
+USER payment-service
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3003/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "const http = require('http'); \
+    const options = { hostname: 'localhost', port: 3008, path: '/health', timeout: 2000 }; \
+    const req = http.request(options, (res) => { \
+      if (res.statusCode === 200) { console.log('Healthy'); process.exit(0); } \
+      else { console.log('Unhealthy'); process.exit(1); } \
+    }); \
+    req.on('error', () => { console.log('Error'); process.exit(1); }); \
+    req.end();"
 
 # Start the application
 CMD ["npm", "start"]

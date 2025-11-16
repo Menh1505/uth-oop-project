@@ -1,359 +1,269 @@
 # Payment Service
 
-Payment Service cho hệ thống đặt món ăn với tích hợp Apple Pay, PayOS và mock gateway để testing.
+The Payment Service manages premium subscriptions and payment processing for the FitFood application. It controls access to premium features like AI-powered recommendations.
 
-## 🌟 Tính Năng
+## Features
 
-### Payment Processing
-- ✅ Tạo và xử lý thanh toán với nhiều gateway
-- ✅ Hỗ trợ Apple Pay với token validation
-- ✅ Tích hợp PayOS cho thanh toán Việt Nam
-- ✅ Mock Gateway cho testing và development
-- ✅ Multi-currency support (VND, USD)
-- ✅ Payment lifecycle management với 7 trạng thái
+- **Subscription Management**: Handle premium subscription plans (basic/premium)
+- **Payment Processing**: Process payments for subscriptions using PayOS integration
+- **Access Control**: Verify premium subscription status for other services
+- **Payment History**: Track user payment history and subscription status
+- **Subscription Lifecycle**: Manage subscription activation, renewal, and cancellation
 
-### Refund Management
-- ✅ Full và partial refunds
-- ✅ Refund request workflow
-- ✅ Admin approval system
-- ✅ Gateway-specific refund processing
+## API Endpoints
 
-### Security & Compliance
-- ✅ JWT authentication và authorization
-- ✅ Rate limiting cho payment endpoints
-- ✅ Webhook signature verification
-- ✅ PCI DSS compliant architecture
-- ✅ Request/response encryption
+### Public Endpoints
 
-### Analytics & Monitoring
-- ✅ Payment statistics và reporting
-- ✅ Transaction history tracking
-- ✅ Revenue analytics
-- ✅ Gateway performance monitoring
-
-## 🏗️ Kiến Trúc
-
-```
-payment-service/
-├── src/
-│   ├── controllers/         # REST API controllers
-│   │   └── PaymentController.ts
-│   ├── services/           # Business logic
-│   │   └── PaymentService.ts
-│   ├── models/             # Data models
-│   │   └── Payment.ts
-│   ├── gateways/           # Payment gateway integrations
-│   │   ├── ApplePayGateway.ts
-│   │   ├── PayOSGateway.ts
-│   │   └── MockGateway.ts
-│   ├── config/             # Configuration
-│   │   └── payment.ts
-│   ├── middleware/         # Express middleware
-│   │   ├── authMiddleware.ts
-│   │   └── errorHandler.ts
-│   ├── routes/             # API routes
-│   │   └── paymentRoutes.ts
-│   ├── app.ts             # Express app setup
-│   └── server.ts          # Server startup
-├── Dockerfile
-├── package.json
-├── tsconfig.json
-└── README.md
+#### Get Subscription Plans
+```http
+GET /api/payments/plans
 ```
 
-## 🚀 Cài Đặt và Chạy
+Returns available subscription plans.
 
-### Development
-
-```zsh
-# Cài đặt dependencies
-npm install
-
-# Chạy development server
-npm run dev
-
-# Build production
-npm run build
-
-# Start production server
-npm start
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "type": "basic",
+      "price": 0,
+      "duration_days": 30,
+      "features": ["Basic meal tracking", "Exercise logging"],
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "type": "premium",
+      "price": 199000,
+      "duration_days": 30,
+      "features": ["All basic features", "AI recommendations", "Advanced analytics"],
+      "is_active": true
+    }
+  ]
+}
 ```
 
-### Docker
+### Protected Endpoints (Require Authentication)
 
-```zsh
-# Build image
-docker build -t payment-service .
-
-# Run container
-docker run -p 3003:3003 payment-service
+#### Check User Subscription Status
+```http
+GET /api/payments/user/:userId/subscription
+Authorization: Bearer <jwt_token>
 ```
 
-### Docker Compose (Recommended)
-
-```zsh
-# Từ thư mục backend
-docker-compose up payment-service
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "is_premium": true,
+    "subscription": {
+      "id": 123,
+      "user_id": 1,
+      "subscription_id": 2,
+      "start_date": "2024-01-01T00:00:00.000Z",
+      "end_date": "2024-01-31T23:59:59.999Z",
+      "is_active": true,
+      "auto_renew": true
+    },
+    "remaining_days": 25
+  }
+}
 ```
 
-## 🔧 Cấu Hình
+#### Create Payment for Subscription
+```http
+POST /api/payments/user/:userId/payment
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
 
-### Environment Variables
+**Request Body:**
+```json
+{
+  "amount": 199000,
+  "currency": "VND",
+  "subscription_id": 2,
+  "payment_method": "payos"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 456,
+    "user_id": 1,
+    "amount": 199000,
+    "currency": "VND",
+    "status": "completed",
+    "payment_method": "payos",
+    "transaction_id": "tx_1704067200000",
+    "created_at": "2024-01-01T00:00:00.000Z"
+  },
+  "message": "Payment processed successfully"
+}
+```
+
+#### Get Payment History
+```http
+GET /api/payments/user/:userId/payments
+Authorization: Bearer <jwt_token>
+```
+
+#### Cancel Subscription
+```http
+DELETE /api/payments/user/:userId/subscription
+Authorization: Bearer <jwt_token>
+```
+
+## Environment Variables
 
 ```env
 # Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/payment_db
 DB_HOST=localhost
 DB_USER=postgres
-DB_PASSWORD=password
-DB_NAME=payment_db
+DB_PASSWORD=password123
+DB_NAME=fitfood_db
 DB_PORT=5432
 
 # JWT
 JWT_SECRET=your-secret-key
 
-# Apple Pay
-APPLE_PAY_MERCHANT_ID=merchant.your.app
-APPLE_PAY_PROCESSING_CERTIFICATE_PATH=/path/to/cert.p12
-APPLE_PAY_PROCESSING_CERTIFICATE_PASSWORD=cert-password
+# PayOS Integration (Add your credentials)
+PAYOS_CLIENT_ID=your_client_id
+PAYOS_API_KEY=your_api_key
+PAYOS_CHECKSUM_KEY=your_checksum_key
 
-# PayOS
-PAYOS_CLIENT_ID=your-client-id
-PAYOS_API_KEY=your-api-key
-PAYOS_CHECKSUM_KEY=your-checksum-key
-PAYOS_RETURN_URL=http://localhost:3000/success
-PAYOS_CANCEL_URL=http://localhost:3000/cancel
+# Service Configuration
+PORT=3008
+NODE_ENV=development
+LOG_LEVEL=info
+CORS_ORIGIN=http://localhost:3000,http://localhost:3001
 
-# Mock Gateway
-MOCK_GATEWAY_SUCCESS_RATE=0.9
-MOCK_GATEWAY_PROCESS_TIME=2000
+# Payment Service URL (for other services to check subscription)
+PAYMENT_SERVICE_URL=http://payment-service:3008
 ```
 
-## 📋 API Endpoints
+## Database Tables
 
-### Payment Management
+The service uses the following database tables:
 
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| `POST` | `/api/payments` | Tạo payment mới | ✅ |
-| `GET` | `/api/payments` | Lấy danh sách payments | ✅ |
-| `GET` | `/api/payments/:id` | Lấy payment theo ID | ✅ |
-| `PUT` | `/api/payments/:id` | Cập nhật payment | ✅ |
-| `DELETE` | `/api/payments/:id` | Hủy payment | ✅ |
+### subscriptions
+- `id`: Subscription plan ID
+- `type`: 'basic' or 'premium'
+- `price`: Price in VND
+- `duration_days`: Subscription duration
+- `features`: JSON array of features
+- `is_active`: Whether the plan is available
 
-### Gateway-Specific Endpoints
+### payments
+- `id`: Payment record ID
+- `user_id`: Reference to user
+- `amount`: Payment amount
+- `currency`: Payment currency
+- `status`: 'pending', 'completed', 'failed', 'cancelled'
+- `payment_method`: Payment method used
+- `transaction_id`: Gateway transaction ID
+- `gateway_response`: Gateway response data
 
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| `POST` | `/api/apple-pay` | Tạo Apple Pay payment | ✅ |
-| `POST` | `/api/payos` | Tạo PayOS payment | ✅ |
-| `POST` | `/api/mock` | Tạo Mock payment (testing) | ✅ |
+### user_subscriptions
+- `id`: User subscription ID
+- `user_id`: Reference to user
+- `subscription_id`: Reference to subscription plan
+- `payment_id`: Reference to payment
+- `start_date`: Subscription start date
+- `end_date`: Subscription end date
+- `is_active`: Whether subscription is active
+- `auto_renew`: Whether to auto-renew
 
-### Refund Management
+## Premium Access Control
 
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| `POST` | `/api/refunds` | Tạo refund request | ✅ |
+Other services can check premium subscription status by making requests to:
 
-### Webhooks
-
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| `POST` | `/api/webhooks/apple-pay` | Apple Pay webhook | ❌ |
-| `POST` | `/api/webhooks/payos` | PayOS webhook | ❌ |
-| `POST` | `/api/webhooks/mock` | Mock webhook | ❌ |
-
-### Analytics
-
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| `GET` | `/api/stats` | Payment statistics | ✅ |
-| `GET` | `/api/admin/payments` | Admin - All payments | 👑 |
-| `GET` | `/api/admin/stats` | Admin - Global stats | 👑 |
-
-### Health Check
-
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| `GET` | `/health` | Service health check | ❌ |
-
-## 💳 Payment Gateways
-
-### Apple Pay Gateway
-- **Tích hợp**: Apple Pay Processing API
-- **Features**: Token validation, Payment processing, Refunds
-- **Testing**: Apple Pay Sandbox environment
-
-### PayOS Gateway  
-- **Tích hợp**: PayOS Vietnam API
-- **Features**: Bank transfer, QR code payments, Refunds
-- **Testing**: PayOS Sandbox environment
-
-### Mock Gateway
-- **Mục đích**: Testing và development
-- **Features**: Configurable success rate, Processing time simulation
-- **Testing**: Perfect cho automated testing
-
-## 🔒 Security Features
-
-### Authentication & Authorization
-```typescript
-// JWT Token required cho tất cả protected endpoints
-Authorization: Bearer <your-jwt-token>
-
-// Admin endpoints cần role = 'admin'
-{
-  "userId": "user123",
-  "email": "user@example.com", 
-  "role": "admin"
-}
+```http
+GET /api/payments/user/:userId/subscription
 ```
 
-### Rate Limiting
-- **General API**: 100 requests/15 minutes per IP
-- **Payment Creation**: 10 requests/5 minutes per IP
-- **Webhook Processing**: Unlimited (with signature verification)
+The recommendation service uses this endpoint to verify premium access before providing AI recommendations.
 
-### Request Validation
-- Input sanitization và validation
-- Payment amount limits
-- Currency format validation
-- Gateway-specific data validation
+## Integration with Recommendation Service
 
-## 📊 Database Schema
+The recommendation service includes middleware that:
+1. Authenticates the user with JWT
+2. Checks premium subscription status via Payment Service
+3. Allows/denies access to AI recommendations based on subscription
 
-### Payments Table
-```sql
-CREATE TABLE payments (
-    id UUID PRIMARY KEY,
-    user_id VARCHAR(255) NOT NULL,
-    order_id VARCHAR(255),
-    payment_method VARCHAR(50) NOT NULL,
-    payment_gateway VARCHAR(50) NOT NULL,
-    amount DECIMAL(15,2) NOT NULL,
-    currency VARCHAR(3) NOT NULL DEFAULT 'VND',
-    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-    customer_name VARCHAR(255) NOT NULL,
-    customer_email VARCHAR(255) NOT NULL,
-    -- ... more fields
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-```
+If the payment service is unavailable, the system can be configured to:
+- **Fail Open**: Allow access (set `SUBSCRIPTION_CHECK_FAIL_OPEN=true`)
+- **Fail Closed**: Deny access (default behavior)
 
-### Payment Status Lifecycle
-```
-PENDING → PROCESSING → COMPLETED
-    ↓         ↓           ↓
-CANCELLED  FAILED    REFUNDED/PARTIALLY_REFUNDED
-```
+## PayOS Integration
 
-## 🧪 Testing
+The service is configured for PayOS payment gateway integration. To enable:
 
-### Unit Tests
-```zsh
+1. Sign up for PayOS account
+2. Get your credentials (Client ID, API Key, Checksum Key)
+3. Add credentials to environment variables
+4. Implement webhook handling for payment notifications
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run dev
+
+# Build the project
+npm run build
+
+# Start production server
+npm start
+
+# Run tests
 npm test
 ```
 
-### Integration Tests  
-```zsh
-npm run test:integration
+## Testing
+
+```bash
+# Run the test script
+./test.sh
+
+# Test health endpoint
+curl http://localhost:3008/health
+
+# Test subscription plans
+curl http://localhost:3008/api/payments/plans
 ```
 
-### Mock Payment Testing
-```javascript
-// Tạo mock payment cho testing
-POST /api/mock
-{
-  "amount": 100000,
-  "currency": "VND",
-  "customer_name": "Test User",
-  "customer_email": "test@example.com",
-  "description": "Test payment"
-}
+## Docker Deployment
+
+The service includes a Dockerfile for containerized deployment:
+
+```bash
+# Build image
+docker build -t payment-service .
+
+# Run container
+docker run -p 3008:3008 payment-service
 ```
 
-## 📈 Monitoring & Analytics
+The service is included in the main `docker-compose.yml` and will be available at `http://localhost:3018:3008` externally.
 
-### Payment Statistics
-- Total revenue by period
-- Payment success rates
-- Gateway performance comparison  
-- Failed payment analysis
-- Refund metrics
+## Error Handling
 
-### Health Monitoring
-```zsh
-curl http://localhost:3003/health
-```
+The service includes comprehensive error handling for:
+- Database connection issues
+- Payment gateway failures  
+- Invalid subscription plans
+- Authentication/authorization errors
+- Validation errors for payment requests
 
-Response:
-```json
-{
-  "service": "payment-service",
-  "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "version": "1.0.0",
-  "gateways": {
-    "apple_pay": "available",
-    "payos": "available", 
-    "mock_gateway": "available"
-  }
-}
-```
-
-## 🔄 Error Handling
-
-### Common Error Responses
-```json
-{
-  "success": false,
-  "error": "Payment not found",
-  "statusCode": 404,
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "path": "/api/payments/invalid-id"
-}
-```
-
-### Error Codes
-- `400` - Bad Request (validation errors)
-- `401` - Unauthorized (missing/invalid token)
-- `403` - Forbidden (insufficient permissions)
-- `404` - Not Found (resource not found)
-- `429` - Too Many Requests (rate limit exceeded)
-- `500` - Internal Server Error
-
-## 🚧 Development
-
-### Code Structure Guidelines
-- **Controllers**: Handle HTTP requests/responses
-- **Services**: Contain business logic
-- **Gateways**: Handle payment provider integrations
-- **Models**: Define data structures và types
-- **Middleware**: Handle cross-cutting concerns
-
-### Best Practices
-- ✅ Always validate payment amounts
-- ✅ Log all payment operations
-- ✅ Handle gateway timeouts gracefully
-- ✅ Implement idempotency for critical operations
-- ✅ Use secure coding practices for financial data
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/payment-enhancement`
-3. Commit changes: `git commit -am 'Add new payment feature'`
-4. Push to branch: `git push origin feature/payment-enhancement`
-5. Create Pull Request
-
-## 📞 Support
-
-Nếu có vấn đề hoặc câu hỏi:
-- 📧 Email: support@uth-oop-project.com
-- 🐛 Issues: GitHub Issues
-- 📖 Docs: [Payment Service Documentation](./DOCS.md)
-
----
-
-**Payment Service** - Secure, scalable payment processing for modern applications 💳✨
+All errors are logged using Winston logger and return structured JSON responses.
