@@ -1,205 +1,231 @@
 import { Request, Response } from 'express';
-import RecommendationService from '../services/RecommendationService';
-import OpenAIService from '../services/OpenAIService';
-import { RecommendationRequest } from '../models/Recommendation';
+import { UserDataService } from '../services/UserDataService';
+import { AIRecommendationService } from '../services/AIRecommendationService';
+import { RecommendationRequest } from '../models/types';
+import logger from '../config/logger';
+import pool from '../config/database';
 
 export class RecommendationController {
-  // Generate recommendations for user
-  async generateRecommendations(req: Request, res: Response) {
+  
+  static async getRecommendation(req: Request, res: Response): Promise<void> {
     try {
-      const { userId } = req.params;
-      const { type, count, context } = req.body as Partial<RecommendationRequest>;
+      const { user_id, type = 'general', context } = req.body as RecommendationRequest;
       
-      const request: RecommendationRequest = {
-        userId,
-        type,
-        count: count || 5,
+      if (!user_id) {
+        res.status(400).json({
+          success: false,
+          message: 'User ID is required'
+        });
+        return;
+      }
+
+      logger.info(`Generating ${type} recommendation for user ${user_id}`);
+
+      // Fetch all user data
+      const userData = await UserDataService.getAllUserData(user_id);
+      
+      // Add context if provided
+      const promptData = {
+        ...userData,
         context
       };
 
-      const recommendations = await RecommendationService.generateRecommendations(request);
-      
+      // Generate AI recommendation based on type
+      let recommendation;
+      switch (type) {
+        case 'meal':
+          recommendation = await AIRecommendationService.generateMealRecommendation(promptData);
+          break;
+        case 'exercise':
+          recommendation = await AIRecommendationService.generateExerciseRecommendation(promptData);
+          break;
+        case 'nutrition':
+          recommendation = await AIRecommendationService.generateNutritionRecommendation(promptData);
+          break;
+        default:
+          recommendation = await AIRecommendationService.generateRecommendation(promptData, type);
+      }
+
+      // Save recommendation to database
+      await RecommendationController.saveRecommendation(user_id, recommendation);
+
       res.json({
         success: true,
-        data: recommendations,
-        metadata: {
-          totalCount: recommendations.length,
-          aiGenerated: OpenAIService.isEnabled(),
-          cacheHit: false
-        }
+        recommendation
       });
-    } catch (error: any) {
+
+    } catch (error) {
+      logger.error('Error generating recommendation:', error);
       res.status(500).json({
         success: false,
-        message: error.message || 'Failed to generate recommendations'
+        message: 'Failed to generate recommendation',
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
 
-  // Get user's existing recommendations
-  async getUserRecommendations(req: Request, res: Response) {
+  static async getRecommendationHistory(req: Request, res: Response): Promise<void> {
     try {
-      const { userId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 20;
+      const userId = parseInt(req.params.userId);
+      const limit = parseInt(req.query.limit as string) || 10;
       const type = req.query.type as string;
-      
-      let recommendations = await RecommendationService.getUserRecommendations(userId, limit);
-      
-      // Filter by type if specified
-      if (type && (type === 'exercise' || type === 'food')) {
-        recommendations = recommendations.filter(r => r.type === type);
+
+      if (!userId) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid user ID'
+        });
+        return;
       }
-      
+
+      let query = `
+        SELECT 
+          recommendation_id,
+          type,
+          title,
+          content,
+          confidence,
+          created_at
+        FROM recommendations 
+        WHERE user_id = $1
+      `;
+      const params: any[] = [userId];
+
+      if (type) {
+        query += ' AND type = $2';
+        params.push(type);
+        query += ' ORDER BY created_at DESC LIMIT $3';
+        params.push(limit);
+      } else {
+        query += ' ORDER BY created_at DESC LIMIT $2';
+        params.push(limit);
+      }
+
+      const result = await pool.query(query, params);
+
       res.json({
         success: true,
-        data: recommendations,
-        count: recommendations.length
+        recommendations: result.rows,
+        count: result.rows.length
       });
-    } catch (error: any) {
+
+    } catch (error) {
+      logger.error('Error fetching recommendation history:', error);
       res.status(500).json({
         success: false,
-        message: error.message || 'Failed to get recommendations'
+        message: 'Failed to fetch recommendation history'
       });
     }
   }
 
-  // Update recommendation status (viewed, accepted, dismissed)
-  async updateRecommendationStatus(req: Request, res: Response) {
+  static async getDailyRecommendation(req: Request, res: Response): Promise<void> {
     try {
-      const { userId, recommendationId } = req.params;
-      const { status } = req.body;
+      const userId = parseInt(req.params.userId);
       
-      if (!['viewed', 'accepted', 'dismissed'].includes(status)) {
-        return res.status(400).json({
+      if (!userId) {
+        res.status(400).json({
           success: false,
-          message: 'Invalid status. Must be one of: viewed, accepted, dismissed'
+          message: 'Invalid user ID'
         });
+        return;
       }
+
+      // Check if user already has a recommendation for today
+      const todayQuery = `
+        SELECT * FROM recommendations 
+        WHERE user_id = $1 
+          AND DATE(created_at) = CURRENT_DATE 
+          AND type = 'general'
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `;
       
-      const updated = await RecommendationService.updateRecommendationStatus(
-        userId, 
-        recommendationId, 
-        status
+      const existingRec = await pool.query(todayQuery, [userId]);
+      
+      if (existingRec.rows.length > 0) {
+        res.json({
+          success: true,
+          recommendation: existingRec.rows[0],
+          isNew: false
+        });
+        return;
+      }
+
+      // Generate new daily recommendation
+      const userData = await UserDataService.getAllUserData(userId);
+      
+      const recommendation = await AIRecommendationService.generateRecommendation(
+        userData, 
+        'general'
       );
-      
-      if (!updated) {
-        return res.status(404).json({
-          success: false,
-          message: 'Recommendation not found'
-        });
-      }
-      
+
+      await RecommendationController.saveRecommendation(userId, recommendation);
+
       res.json({
         success: true,
-        message: `Recommendation status updated to ${status}`
+        recommendation,
+        isNew: true
       });
-    } catch (error: any) {
+
+    } catch (error) {
+      logger.error('Error generating daily recommendation:', error);
       res.status(500).json({
         success: false,
-        message: error.message || 'Failed to update recommendation status'
+        message: 'Failed to generate daily recommendation'
       });
     }
   }
 
-  // Get exercise recommendations specifically
-  async getExerciseRecommendations(req: Request, res: Response) {
+  private static async saveRecommendation(userId: number, recommendation: any) {
     try {
-      const { userId } = req.params;
-      const count = parseInt(req.query.count as string) || 5;
+      const query = `
+        INSERT INTO recommendations (
+          user_id, type, title, content, 
+          confidence, reasoning, actionable_items
+        ) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING recommendation_id
+      `;
       
-      const request: RecommendationRequest = {
+      const values = [
         userId,
-        type: 'exercise',
-        count
-      };
+        recommendation.type,
+        recommendation.title,
+        recommendation.content,
+        recommendation.confidence,
+        recommendation.reasoning,
+        JSON.stringify(recommendation.actionable_items || [])
+      ];
 
-      const recommendations = await RecommendationService.generateRecommendations(request);
+      const result = await pool.query(query, values);
+      logger.info(`Saved recommendation ${result.rows[0].recommendation_id} for user ${userId}`);
       
-      res.json({
-        success: true,
-        data: recommendations,
-        metadata: {
-          totalCount: recommendations.length,
-          type: 'exercise',
-          aiGenerated: OpenAIService.isEnabled()
-        }
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Failed to get exercise recommendations'
-      });
+    } catch (error) {
+      logger.error('Error saving recommendation:', error);
+      // Don't throw error, just log it - recommendation should still be returned
     }
   }
 
-  // Get food recommendations specifically
-  async getFoodRecommendations(req: Request, res: Response) {
+  // Health check endpoint
+  static async health(req: Request, res: Response): Promise<void> {
     try {
-      const { userId } = req.params;
-      const count = parseInt(req.query.count as string) || 5;
-      
-      const request: RecommendationRequest = {
-        userId,
-        type: 'food',
-        count
-      };
-
-      const recommendations = await RecommendationService.generateRecommendations(request);
+      // Test database connection
+      await pool.query('SELECT 1');
       
       res.json({
-        success: true,
-        data: recommendations,
-        metadata: {
-          totalCount: recommendations.length,
-          type: 'food',
-          aiGenerated: OpenAIService.isEnabled()
-        }
+        status: 'OK',
+        service: 'recommendation-service',
+        timestamp: new Date().toISOString(),
+        database: 'connected',
+        ai: process.env.OPENAI_API_KEY ? 'configured' : 'not configured'
       });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Failed to get food recommendations'
-      });
-    }
-  }
-
-  // Quick recommendation endpoint (mixed exercise + food)
-  async getQuickRecommendations(req: Request, res: Response) {
-    try {
-      const { userId } = req.params;
-      
-      const request: RecommendationRequest = {
-        userId,
-        count: 6 // 3 exercise + 3 food
-      };
-
-      const recommendations = await RecommendationService.generateRecommendations(request);
-      
-      // Separate by type
-      const exercises = recommendations.filter(r => r.type === 'exercise');
-      const foods = recommendations.filter(r => r.type === 'food');
-      
-      res.json({
-        success: true,
-        data: {
-          exercises: exercises.slice(0, 3),
-          foods: foods.slice(0, 3),
-          all: recommendations
-        },
-        metadata: {
-          totalCount: recommendations.length,
-          exerciseCount: exercises.length,
-          foodCount: foods.length,
-          aiGenerated: OpenAIService.isEnabled()
-        }
-      });
-    } catch (error: any) {
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Failed to get quick recommendations'
+    } catch (error) {
+      res.status(503).json({
+        status: 'Error',
+        service: 'recommendation-service',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
 }
-
-export default new RecommendationController();

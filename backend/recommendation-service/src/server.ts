@@ -1,24 +1,89 @@
-import createApp from './app';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+import recommendationRoutes from './routes/recommendationRoutes';
+import logger from './config/logger';
 
-const app = createApp();
-const port = process.env.PORT || 3011;
+// Load environment variables
+dotenv.config();
 
-app.listen(port, () => {
-  console.log(`🚀 Recommendation Service running on port ${port}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🤖 AI Recommendations: ${process.env.ENABLE_AI_RECOMMENDATIONS === 'true' ? 'Enabled' : 'Disabled'}`);
-  console.log(`🔑 OpenAI API Key: ${process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here' ? 'Configured' : 'Not configured (using fallback)'}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/health`);
+const app = express();
+const PORT = process.env.PORT || 3007;
+
+// Security middleware
+app.use(helmet());
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  credentials: true
+}));
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Logging middleware
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.url}`, {
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
+  });
+  next();
+});
+
+// Routes
+app.use('/recommendations', recommendationRoutes);
+
+// Root health check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    service: 'recommendation-service',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    path: req.originalUrl
+  });
+});
+
+// Global error handler
+app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error:', error);
+  
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? error.message : undefined
+  });
+});
+
+// Start server
+app.listen(PORT, () => {
+  logger.info(`Recommendation service started on port ${PORT}`);
+  logger.info('Environment:', {
+    nodeEnv: process.env.NODE_ENV,
+    dbHost: process.env.DB_HOST,
+    openaiConfigured: !!process.env.OPENAI_API_KEY
+  });
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('Received SIGTERM, shutting down gracefully...');
+  logger.info('SIGTERM received, shutting down gracefully');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log('Received SIGINT, shutting down gracefully...');
+  logger.info('SIGINT received, shutting down gracefully');
   process.exit(0);
 });
 
