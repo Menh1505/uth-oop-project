@@ -1,422 +1,104 @@
 # ============================================================================
-# MICROSERVICES PROJECT GITIGNORE
-# UTH OOP Project - Food Delivery Platform
+# NODE MODULES & LOGS
 # ============================================================================
-
-# ============================================================================
-# NODE.JS & NPM
-# ============================================================================
-# Dependencies
 node_modules/
+*/node_modules/
 npm-debug.log*
-yarn-debug.log*
 yarn-error.log*
-package-lock.json
-yarn.lock
 pnpm-lock.yaml
 
-# Runtime logs
-*.log
 logs/
+*.log
 *.log.*
-lerna-debug.log*
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# node-waf configuration
-.lock-wscript
 
 # ============================================================================
 # BUILD OUTPUTS
 # ============================================================================
-# TypeScript build outputs
 dist/
+*/dist/
 build/
-out/
-lib/
-
-# ESBuild
-.esbuild/
-
-# Webpack
-.webpack/
+*/build/
 
 # ============================================================================
-# ENVIRONMENT & CONFIGURATION
+# ENVIRONMENT
 # ============================================================================
-# Environment variables
 .env
 .env.*
 !.env.example
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Service-specific configs
 */.env
 */.env.*
 !*/.env.example
 
-# Config files with secrets
-config.json
-secrets.json
-credentials.json
-
 # ============================================================================
 # DATABASE & STORAGE
 # ============================================================================
-# Database files
 *.db
-*.sqlite
-*.sqlite3
-*.db-journal
-
-# PostgreSQL
+*.sqlite*
 pg_data/
-postgres_data/
-
-# Redis
 redis_data/
-dump.rdb
-
-# ============================================================================
-# MICROSERVICES SPECIFIC
-# ============================================================================
-# Service logs
-auth-service/logs/
-user-service/logs/
-admin-service/logs/
-order-service/logs/
-payment-service/logs/
-partner-service/logs/
-delivery-service/logs/
-notification-service/logs/
-recommendation-service/logs/
-workout-service/logs/
-nutrition-service/logs/
-catalog-service/logs/
-
-# Service temporary files
-*/temp/
-*/tmp/
-*/cache/
-*/.cache/
-
-# Service build artifacts
-*/dist/
-*/build/
-*/out/
-
-# Service node_modules (redundant but explicit)
-*/node_modules/
-
-# ============================================================================
-# DOCKER & CONTAINERIZATION
-# ============================================================================
-# Docker
-docker-compose.override.yml
-docker-compose.local.yml
-docker-compose.dev.yml
-.dockerignore.local
-
-# Docker volumes data
-postgres_data/
 rabbitmq_data/
-prometheus_data/
-grafana_data/
-elasticsearch_data/
-redis_data/
 
 # ============================================================================
-# MONITORING & OBSERVABILITY
+# TEMP & CACHE
 # ============================================================================
-# Prometheus data
-prometheus/
-grafana/data/
-grafana/logs/
-
-# Jaeger
-jaeger_data/
-
-# Elasticsearch
-elasticsearch/
-
-# Application logs
-application.log
-error.log
-access.log
-combined.log
-
-# Metrics and traces
-metrics/
-traces/
-spans/
-
-# ============================================================================
-# DEVELOPMENT TOOLS & IDEs
-# ============================================================================
-# Visual Studio Code
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# IntelliJ IDEA
-.idea/
-*.iws
-*.iml
-*.ipr
-
-# WebStorm
-.webstorm/
-
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-
-# Vim
-*.swp
-*.swo
-*~
-
-# Emacs
-*~
-\#*\#
-/.emacs.desktop
-/.emacs.desktop.lock
-*.elc
-auto-save-list
-tramp
-.\#*
-
-# ============================================================================
-# OPERATING SYSTEM
-# ============================================================================
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-Icon?
-._*
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-
-# Windows
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-*.stackdump
-[Dd]esktop.ini
-$RECYCLE.BIN/
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-*.lnk
-
-# Linux
-*~
-.fuse_hidden*
-.directory
-.Trash-*
-.nfs*
-
-# ============================================================================
-# TESTING
-# ============================================================================
-# Test results
-test-results/
-test-reports/
-coverage/
-.nyc_output/
-junit.xml
-
-# Jest
-jest_*
-.jest/
-
-# Mocha
-.mocha/
-
-# ============================================================================
-# TEMPORARY & CACHE FILES
-# ============================================================================
-# Temporary files
-*.tmp
-*.temp
-temp/
 tmp/
-.tmp/
-
-# Cache directories
+temp/
 .cache/
-.parcel-cache/
-.next/
-.nuxt/
-.vuepress/dist
-
-# ESLint cache
+*/.cache/
 .eslintcache
-
-# TypeScript cache
 *.tsbuildinfo
 
-# Dependency directories
-jspm_packages/
+# ============================================================================
+# DOCKER
+# ============================================================================
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Docker volumes
+postgres_data/
+rabbitmq_data/
+grafana_data/
+prometheus_data/
 
 # ============================================================================
-# AI & MACHINE LEARNING
+# IDE & OS
 # ============================================================================
-# Python (for AI services)
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv/
+.vscode/
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
 
-# Jupyter Notebooks
-.ipynb_checkpoints
-
-# Model files
-*.model
+# ============================================================================
+# AI MODELS (CHỈ IGNORE WEIGHTS LỚN)
+# ============================================================================
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.h5
 *.pkl
 *.joblib
-models/
-checkpoints/
+
+# — GIỮ LẠI source code của model (Python, JS, config)
+# KHÔNG ignore folder models/
+# Vì team cần đồng bộ pipeline, preprocessing, config.
 
 # ============================================================================
-# DOCUMENTATION & ASSETS
+# DOCS & GENERATED FILES
 # ============================================================================
-# Generated documentation
-docs/build/
-site/
-
-# Asset processing
-.sass-cache/
-*.css.map
-*.js.map
-
-# ============================================================================
-# SECURITY & CERTIFICATES
-# ============================================================================
-# SSL certificates
-*.pem
-*.key
-*.crt
-*.csr
-*.p12
-*.pfx
-
-# GPG keys
-*.gpg
-*.asc
-
-# SSH keys
-*.pub
-id_rsa
-id_ed25519
-
-# ============================================================================
-# BACKUP & VERSION FILES
-# ============================================================================
-# Backup files
-*.bak
-*.backup
-*.old
-*.orig
-
-# Version control
-.git/
-.svn/
-.hg/
-
-# ============================================================================
-# MISCELLANEOUS
-# ============================================================================
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache
-.parcel-cache
-
-# Store used by nx
-.nx/cache
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# ============================================================================
-# PROJECT SPECIFIC
-# ============================================================================
-# Notification logs
-notifications.log
-*.notification
-
-# Upload directories
-uploads/
-files/
-attachments/
-
-# Generated API documentation
 api-docs/
 swagger-ui/
-
-# Load testing
-k6-results/
-artillery-reports/
-
-# Performance monitoring
-newrelic_agent.log
-.newrelic/
+coverage/
+nyc_output/
+*.tgz
 
 # ============================================================================
-# END OF GITIGNORE
+# CERTIFICATES
 # ============================================================================
+*.pem
+*.key
+*.csr
+*.crt
+*.p12
+*.pfx
