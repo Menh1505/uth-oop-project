@@ -195,48 +195,48 @@ export class MealService {
 
     const totalCalories = meal.total_calories;
     
-    const detailed_breakdown = meal.foods.map(mealFood => ({
+    const detailed_breakdown = meal.foods.map((mealFood: any) => ({
       food: mealFood.food,
       quantity: mealFood.quantity,
       unit: mealFood.unit,
-      calories_contribution: mealFood.calories_consumed,
-      protein_contribution: mealFood.protein_consumed,
-      carbs_contribution: mealFood.carbs_consumed,
-      fat_contribution: mealFood.fat_consumed,
-      percentage_of_meal: totalCalories > 0 ? (mealFood.calories_consumed / totalCalories) * 100 : 0
+      calories_contribution: (mealFood.calories_consumed || 0),
+      protein_contribution: (mealFood.protein_consumed || 0),
+      carbs_contribution: (mealFood.carbs_consumed || 0),
+      fat_contribution: (mealFood.fat_consumed || 0),
+      percentage_of_meal: (meal.total_calories || 0) > 0 ? ((mealFood.calories_consumed || 0) / (meal.total_calories || 1)) * 100 : 0
     }));
 
     // Calculate macro distribution
-    const totalMacroCalories = (meal.total_protein * 4) + (meal.total_carbs * 4) + (meal.total_fat * 9);
+    const totalMacroCalories = ((meal.total_protein || 0) * 4) + ((meal.total_carbs || 0) * 4) + ((meal.total_fat || 0) * 9);
     const macro_distribution = {
-      protein_percentage: totalMacroCalories > 0 ? (meal.total_protein * 4 / totalMacroCalories) * 100 : 0,
-      carbs_percentage: totalMacroCalories > 0 ? (meal.total_carbs * 4 / totalMacroCalories) * 100 : 0,
-      fat_percentage: totalMacroCalories > 0 ? (meal.total_fat * 9 / totalMacroCalories) * 100 : 0
+      protein_percentage: totalMacroCalories > 0 ? ((meal.total_protein || 0) * 4 / totalMacroCalories) * 100 : 0,
+      carbs_percentage: totalMacroCalories > 0 ? ((meal.total_carbs || 0) * 4 / totalMacroCalories) * 100 : 0,
+      fat_percentage: totalMacroCalories > 0 ? ((meal.total_fat || 0) * 9 / totalMacroCalories) * 100 : 0
     };
 
     // Calculate vitamins and minerals
-    const vitamin_minerals = meal.foods.reduce((acc, mealFood) => {
-      const ratio = mealFood.quantity / mealFood.food.serving_size;
+    const vitamin_minerals = meal.foods.reduce((acc: any, mealFood: any) => {
+      const ratio = mealFood.quantity / (mealFood.food?.serving_size || 1);
       return {
-        vitamin_a: acc.vitamin_a + (mealFood.food.vitamin_a * ratio),
-        vitamin_c: acc.vitamin_c + (mealFood.food.vitamin_c * ratio),
-        calcium: acc.calcium + (mealFood.food.calcium * ratio),
-        iron: acc.iron + (mealFood.food.iron * ratio),
-        sodium: acc.sodium + (mealFood.food.sodium * ratio),
-        cholesterol: acc.cholesterol + (mealFood.food.cholesterol * ratio)
+        vitamin_a: acc.vitamin_a + ((mealFood.food?.vitamin_a || 0) * ratio),
+        vitamin_c: acc.vitamin_c + ((mealFood.food?.vitamin_c || 0) * ratio),
+        calcium: acc.calcium + ((mealFood.food?.calcium || 0) * ratio),
+        iron: acc.iron + ((mealFood.food?.iron || 0) * ratio),
+        sodium: acc.sodium + ((mealFood.food?.sodium || 0) * ratio),
+        cholesterol: acc.cholesterol + ((mealFood.food?.cholesterol || 0) * ratio)
       };
     }, { vitamin_a: 0, vitamin_c: 0, calcium: 0, iron: 0, sodium: 0, cholesterol: 0 });
 
     // Check diet compatibility
     const diet_compatibility = {
-      is_vegetarian: meal.foods.every(mealFood => mealFood.food.is_vegetarian),
-      is_vegan: meal.foods.every(mealFood => mealFood.food.is_vegan),
-      is_gluten_free: meal.foods.every(mealFood => mealFood.food.is_gluten_free),
+      is_vegetarian: meal.foods.every((mealFood: any) => mealFood.food?.is_vegetarian),
+      is_vegan: meal.foods.every((mealFood: any) => mealFood.food?.is_vegan),
+      is_gluten_free: meal.foods.every((mealFood: any) => mealFood.food?.is_gluten_free),
       allergens_present: [
         ...new Set(
           meal.foods
-            .flatMap(mealFood => mealFood.food.allergens || [])
-            .filter(allergen => allergen)
+            .flatMap((mealFood: any) => mealFood.food?.allergens || [])
+            .filter((allergen: any) => allergen)
         )
       ]
     };
@@ -246,7 +246,13 @@ export class MealService {
       detailed_breakdown,
       macro_distribution,
       vitamin_minerals,
-      diet_compatibility
+      diet_compatibility,
+      total_calories: meal?.total_calories || 0,
+      total_protein: meal?.total_protein || 0,
+      total_carbs: meal?.total_carbs || 0,
+      total_fat: meal?.total_fat || 0,
+      macro_breakdown: macro_distribution || { protein_percentage: 0, carbs_percentage: 0, fat_percentage: 0 },
+      micronutrients: vitamin_minerals || {}
     };
   }
 
@@ -276,8 +282,8 @@ export class MealService {
     }, 50);
 
     // Filter out excluded foods
-    const availableFoods = foods.filter(food => 
-      !criteria.exclude_foods?.includes(food.food_id)
+    const availableFoods = foods.filter((food: any) => 
+      !criteria.exclude_foods?.includes(food.id)
     );
 
     if (availableFoods.length === 0) {
@@ -291,7 +297,7 @@ export class MealService {
     let totalCarbs = 0;
     let totalFat = 0;
 
-    const recommended_foods = selectedFoods.map(food => {
+    const recommended_foods = selectedFoods.map((food: any) => {
       // Calculate suggested quantity to meet targets
       const calorieRatio = Math.min(1, targetCalories / (food.calories * selectedFoods.length));
       const suggestedQuantity = Math.round(food.serving_size * calorieRatio);
@@ -308,35 +314,38 @@ export class MealService {
       totalFat += fat_contribution;
 
       return {
-        food,
-        suggested_quantity: suggestedQuantity,
-        unit: food.serving_unit,
-        calories_contribution,
-        protein_contribution,
-        carbs_contribution,
-        fat_contribution
+        food_id: food.id,
+        food_name: food.food_name,
+        quantity: suggestedQuantity,
+        unit: food.serving_unit || 'g'
       };
     });
 
     // Calculate match score based on how close we are to targets
     const calorieScore = Math.max(0, 100 - Math.abs(totalCalories - targetCalories) / targetCalories * 100);
-    const proteinScore = Math.max(0, 100 - Math.abs(totalProtein - targetProtein) / targetProtein * 100);
-    const carbsScore = Math.max(0, 100 - Math.abs(totalCarbs - targetCarbs) / targetCarbs * 100);
-    const fatScore = Math.max(0, 100 - Math.abs(totalFat - targetFat) / targetFat * 100);
+    const proteinScore = Math.max(0, 100 - Math.abs(totalProtein - targetProtein) / (targetProtein || 1) * 100);
+    const carbsScore = Math.max(0, 100 - Math.abs(totalCarbs - targetCarbs) / (targetCarbs || 1) * 100);
+    const fatScore = Math.max(0, 100 - Math.abs(totalFat - targetFat) / (targetFat || 1) * 100);
     
     const match_score = Math.round((calorieScore + proteinScore + carbsScore + fatScore) / 4);
 
     recommendations.push({
+      meal_id: '',
+      meal_name: criteria.meal_type || 'Suggested Meal',
       meal_type: criteria.meal_type || 'Snack',
+      description: `A meal with approximately ${Math.round(totalCalories)} calories`,
       estimated_calories: totalCalories,
       estimated_protein: totalProtein,
       estimated_carbs: totalCarbs,
       estimated_fat: totalFat,
+      preparation_time: 30,
+      foods: recommended_foods,
       recommended_foods,
+      benefits: [],
       match_score
     });
 
-    return recommendations.sort((a, b) => b.match_score - a.match_score);
+    return recommendations.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
   }
 
   // Helper methods

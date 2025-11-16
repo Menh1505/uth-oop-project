@@ -9,7 +9,8 @@ import {
   AddFoodToMealPayload,
   UpdateMealFoodPayload,
   NutritionSummary,
-  DailyNutritionSummary
+  DailyNutritionSummary,
+  Food
 } from '../models/Meal';
 import pool from '../config/database';
 
@@ -66,7 +67,8 @@ export class MealRepository {
     `;
     const foodsResult = await this.pool.query(foodsQuery, [mealId]);
 
-    const foods: MealFoodWithDetails[] = foodsResult.rows.map(row => ({
+        const foods: MealFoodWithDetails[] = foodsResult.rows.map(row => ({
+      id: row.meal_food_id,
       meal_food_id: row.meal_food_id,
       meal_id: row.meal_id,
       food_id: row.food_id,
@@ -79,8 +81,10 @@ export class MealRepository {
       notes: row.notes,
       created_at: row.created_at,
       food: {
+        id: row.food_id,
         food_id: row.food_id,
         food_name: row.food_name,
+        category: row.food_category || 'General',
         brand: row.brand,
         serving_size: row.serving_size,
         serving_unit: row.serving_unit,
@@ -96,17 +100,9 @@ export class MealRepository {
         vitamin_c: row.vitamin_c,
         calcium: row.calcium,
         iron: row.iron,
-        food_category: row.food_category,
-        allergens: row.allergens,
-        is_vegetarian: row.is_vegetarian,
-        is_vegan: row.is_vegan,
-        is_gluten_free: row.is_gluten_free,
         barcode: row.barcode,
-        image_url: row.image_url,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
         is_active: row.is_active
-      }
+      } as Food
     }));
 
     return { ...meal, foods };
@@ -364,18 +360,29 @@ export class MealRepository {
     const nutritionData = nutritionResult.rows[0];
     const detailedData = detailedResult.rows[0];
 
+    const totalCalories = parseFloat(detailedData.total_calories) || 0;
+    const totalProtein = parseFloat(detailedData.total_protein) || 0;
+    const totalCarbs = parseFloat(detailedData.total_carbs) || 0;
+    const totalFat = parseFloat(detailedData.total_fat) || 0;
+    const macroCalories = (totalProtein * 4) + (totalCarbs * 4) + (totalFat * 9);
+
     return {
       date,
       meals: mealsResult.rows,
-      total_calories: parseFloat(detailedData.total_calories) || 0,
-      total_protein: parseFloat(detailedData.total_protein) || 0,
-      total_carbs: parseFloat(detailedData.total_carbs) || 0,
-      total_fat: parseFloat(detailedData.total_fat) || 0,
+      total_calories: totalCalories,
+      total_protein: totalProtein,
+      total_carbs: totalCarbs,
+      total_fat: totalFat,
       total_fiber: parseFloat(detailedData.total_fiber) || 0,
       total_sugar: parseFloat(detailedData.total_sugar) || 0,
       total_sodium: parseFloat(detailedData.total_sodium) || 0,
       total_cholesterol: parseFloat(detailedData.total_cholesterol) || 0,
-      meal_count: parseInt(nutritionData.meal_count) || 0
+      macro_breakdown: {
+        protein_percentage: macroCalories > 0 ? (totalProtein * 4 / macroCalories) * 100 : 0,
+        carbs_percentage: macroCalories > 0 ? (totalCarbs * 4 / macroCalories) * 100 : 0,
+        fat_percentage: macroCalories > 0 ? (totalFat * 9 / macroCalories) * 100 : 0
+      },
+      meals_count: parseInt(nutritionData.meal_count) || 0
     };
   }
 
@@ -414,7 +421,11 @@ export class MealRepository {
       total_sugar: parseFloat(data.total_sugar) || 0,
       total_sodium: parseFloat(data.total_sodium) || 0,
       total_cholesterol: parseFloat(data.total_cholesterol) || 0,
-      meal_count: parseInt(data.meal_count) || 0
+      macro_breakdown: {
+        protein_percentage: ((parseFloat(data.total_protein) * 4) / ((parseFloat(data.total_calories) || 1))) * 100,
+        carbs_percentage: ((parseFloat(data.total_carbs) * 4) / ((parseFloat(data.total_calories) || 1))) * 100,
+        fat_percentage: ((parseFloat(data.total_fat) * 9) / ((parseFloat(data.total_calories) || 1))) * 100
+      }
     };
   }
 
