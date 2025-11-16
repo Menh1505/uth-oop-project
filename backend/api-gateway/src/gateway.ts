@@ -51,6 +51,9 @@ export class APIGateway {
 
       // Add timing information
       (request as any).startTime = Date.now();
+      
+      // Log incoming request
+      console.log(`[GATEWAY] ${request.method} ${request.url} - IP: ${request.ip}`);
     });
 
     // CORS handling
@@ -76,6 +79,8 @@ export class APIGateway {
     // Response logging
     this.app.addHook('onResponse', async (request: FastifyRequest, reply: FastifyReply) => {
       const responseTime = Date.now() - ((request as any).startTime || Date.now());
+      
+      console.log(`[GATEWAY] ${request.method} ${request.url} - Status: ${reply.statusCode} (${responseTime}ms)`);
       
       this.app.log.info({
         request_id: request.headers['x-request-id'],

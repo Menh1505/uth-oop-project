@@ -93,7 +93,7 @@ export class UserDataService {
       `;
       
       const result = await pool.query(query, [userId, days]);
-      return result.rows.map(row => ({
+      return result.rows.map((row: any) => ({
         ...row,
         foods: row.foods || []
       }));

@@ -13,6 +13,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
+    "types": ["node"],
     "removeComments": true,
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": false,

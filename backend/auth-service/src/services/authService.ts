@@ -28,14 +28,20 @@ function pickRole(roles: string[]) {
 export class AuthService {
   // ===== core =====
   static async register(email: string, password: string, username?: string) {
+    console.log(`[AUTH] Register attempt: ${email}`);
     const existing = await pool.query('SELECT id FROM users_auth WHERE email = $1', [email]);
-    if (existing.rows.length > 0) throw new Error('User already exists');
+    if (existing.rows.length > 0) {
+      console.log(`[AUTH] User already exists: ${email}`);
+      throw new Error('User already exists');
+    }
 
     const hash = await bcrypt.hash(password, 10);
     const ins = await pool.query(
       'INSERT INTO users_auth (email, username, password_hash, status) VALUES ($1,$2,$3,$4) RETURNING id,email',
       [email, username || null, hash, 'active']
     );
+
+    console.log(`[AUTH] User registered successfully: ${email} (ID: ${ins.rows[0].id})`);
 
     await MessageService.publish('user.registered', {
       userId: ins.rows[0].id, email, timestamp: new Date().toISOString()
@@ -44,10 +50,17 @@ export class AuthService {
   }
 
   static async login(email: string, password: string): Promise<LoginResult | null> {
+    console.log(`[AUTH] Login attempt: ${email}`);
     const user = await getUserByEmail(email);
-    if (!user) return null;
+    if (!user) {
+      console.log(`[AUTH] Login failed - user not found: ${email}`);
+      return null;
+    }
     const ok = await bcrypt.compare(password, user.password_hash);
-    if (!ok) return null;
+    if (!ok) {
+      console.log(`[AUTH] Login failed - invalid password: ${email}`);
+      return null;
+    }
 
     const roles = await getUserRoles(user.id);
     const role = pickRole(roles);
@@ -62,6 +75,8 @@ export class AuthService {
       'INSERT INTO sessions (user_id, refresh_token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4,$5)',
       [user.id, refreshHash, 'api', null, expiresAt]
     );
+
+    console.log(`[AUTH] Login successful: ${email} (Role: ${role})`);
 
     await MessageService.publish('user.logged_in', {
       userId: user.id, email: user.email, role, timestamp: new Date().toISOString()

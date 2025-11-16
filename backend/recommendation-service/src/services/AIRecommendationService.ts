@@ -51,19 +51,19 @@ USER PROFILE:
 - Health Conditions: ${user.health_conditions?.join(', ') || 'None'}
 
 ACTIVE GOALS:
-${goals.filter(g => g.is_active).map(goal => 
+${goals.filter((g: any) => g.is_active).map((goal: any) => 
   `- ${goal.goal_type}: ${goal.description || 'No description'}
     Target: ${goal.target_calories ? `${goal.target_calories} cal` : ''} ${goal.target_protein ? `${goal.target_protein}g protein` : ''} ${goal.target_carbs ? `${goal.target_carbs}g carbs` : ''} ${goal.target_fat ? `${goal.target_fat}g fat` : ''}`
 ).join('\n')}
 
 RECENT MEALS (Last 7 days):
-${recent_meals.slice(0, 5).map(meal => 
+${recent_meals.slice(0, 5).map((meal: any) => 
   `- ${meal.meal_date} (${meal.meal_type}): ${meal.calorie_intake} calories
-    Foods: ${meal.foods.map(f => `${f.food_name} (${f.quantity})`).join(', ')}`
+    Foods: ${meal.foods.map((f: any) => `${f.food_name} (${f.quantity})`).join(', ')}`
 ).join('\n')}
 
 RECENT EXERCISES (Last 7 days):
-${recent_exercises.slice(0, 5).map(ex => 
+${recent_exercises.slice(0, 5).map((ex: any) => 
   `- ${ex.exercise_date}: ${ex.exercise_name} - ${ex.duration_minutes}min, ${ex.calories_burned} cal burned (${ex.intensity} intensity)`
 ).join('\n')}`;
 
@@ -88,7 +88,7 @@ ${recent_exercises.slice(0, 5).map(ex =>
       const systemPrompt = this.createSystemPrompt();
       const userPrompt = this.createUserPrompt(data, type);
 
-      logger.info(`Generating ${type} recommendation for user ${data.user.user_id}`);
+      logger.info(`Generating ${type} recommendation for user ${data.user?.user_id || 'unknown'}`);
 
       const completion = await openai.chat.completions.create({
         model: OPENAI_CONFIG.model,
@@ -123,7 +123,7 @@ ${recent_exercises.slice(0, 5).map(ex =>
         throw new Error('Incomplete recommendation response');
       }
 
-      logger.info(`Successfully generated ${type} recommendation for user ${data.user.user_id}`);
+      logger.info(`Successfully generated ${type} recommendation for user ${data.user?.user_id || 'unknown'}`);
       return recommendation;
 
     } catch (error) {
@@ -131,7 +131,7 @@ ${recent_exercises.slice(0, 5).map(ex =>
       
       // Fallback recommendation
       return {
-        type: type,
+        type: type as any,
         title: 'Personalized Health Tip',
         content: 'Continue following your current routine and make small, sustainable changes to reach your goals. Stay hydrated, get adequate sleep, and listen to your body.',
         confidence: 0.5,

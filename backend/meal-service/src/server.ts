@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { errorHandler } from './middleware/errorHandler';
 import MealRoutes from './routes/MealRoutes';
@@ -32,7 +32,7 @@ app.get('/health', (req, res) => {
 app.use(errorHandler);
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use('*', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     message: 'Endpoint not found',
