@@ -1,25 +1,24 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Home, Building2, Truck, ShoppingCart, Ticket, BarChart3 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
-  const { logout } = useAppStore();
+  const { signOut } = useAppStore();
   const navigate = useNavigate();
 
   const adminMenuItems = [
-    { label: 'Dashboard', icon: Home, path: '/admin/dashboard' },
-    { label: 'Nhà hàng', icon: Building2, path: '/admin/restaurants' },
-    { label: 'Đối tác giao hàng', icon: Truck, path: '/admin/delivery-partners' },
-    { label: 'Đơn hàng', icon: ShoppingCart, path: '/admin/orders' },
-    { label: 'Voucher & Khuyến mãi', icon: Ticket, path: '/admin/vouchers' },
-    { label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
+    { label: 'Dashboard', path: '/admin/dashboard' },
+    { label: 'Nhà hàng', path: '/admin/restaurants' },
+    { label: 'Đối tác giao hàng', path: '/admin/delivery-partners' },
+    { label: 'Đơn hàng', path: '/admin/orders' },
+    { label: 'Voucher & Khuyến mãi', path: '/admin/vouchers' },
+    { label: 'Analytics', path: '/admin/analytics' },
   ];
 
   const handleLogout = () => {
-    logout();
+    signOut();
     navigate('/admin/login');
   };
 
@@ -39,26 +38,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 hover:bg-gray-800 rounded-lg"
           >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            {sidebarOpen ? '✕' : '☰'}
           </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
           {adminMenuItems.map((item) => {
-            const Icon = item.icon;
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`block px-4 py-2 rounded-lg transition ${
                   isActive
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-300 hover:bg-gray-800'
                 }`}
               >
-                <Icon size={20} />
-                {sidebarOpen && <span>{item.label}</span>}
+                {item.label}
               </Link>
             );
           })}
@@ -67,25 +64,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-4 border-t border-gray-800">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+            className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
           >
-            <LogOut size={20} />
-            {sidebarOpen && <span>Đăng xuất</span>}
+            Đăng xuất
           </button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className={`${sidebarOpen ? 'ml-64' : 'ml-20'} flex-1 transition-all duration-300 flex flex-col overflow-hidden`}>
-        {/* Header */}
-        <header className="bg-white shadow h-16 flex items-center px-6 z-30">
-          <h2 className="text-2xl font-bold text-gray-800">Quản lý FitFood</h2>
-        </header>
-
-        {/* Content */}
-        <main className="flex-1 overflow-auto p-6">
+      <div className={`${sidebarOpen ? 'ml-64' : 'ml-20'} flex-1 transition-all duration-300`}>
+        <div className="p-6">
           {children}
-        </main>
+        </div>
       </div>
     </div>
   );

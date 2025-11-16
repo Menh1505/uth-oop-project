@@ -6,6 +6,7 @@ import type { UserProfile } from "../types";
 import { useAppStore } from "../store/useAppStore";
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { ApiClient } from "../lib/api/client";
 
 export default function Onboarding() {
   const { completeOnboarding } = useAppStore();
@@ -47,40 +48,20 @@ export default function Onboarding() {
       if (avatarFile) {
         const avatarFormData = new FormData();
         avatarFormData.append('avatar', avatarFile);
-        
-        const avatarResponse = await fetch('/api/users/me/avatar', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: avatarFormData,
-        });
 
-        if (avatarResponse.ok) {
-          const avatarData = await avatarResponse.json();
-          avatarUrl = avatarData.avatar_url;
-          profileData.avatar_url = avatarUrl;
-        } else {
+        try {
+          const avatarData = await ApiClient.post<{ avatar_url: string }>('/users/me/avatar', avatarFormData);
+          if (avatarData?.avatar_url) {
+            avatarUrl = avatarData.avatar_url;
+            profileData.avatar_url = avatarUrl;
+          }
+        } catch (err) {
           console.warn('Avatar upload failed, continuing without avatar');
         }
       }
 
-      // Send profile to backend
-      const response = await fetch('/api/users/me', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(profileData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Cập nhật profile thất bại');
-      }
-
-      await response.json();
+      // Send profile to backend using ApiClient
+      await ApiClient.put('/users/me', profileData);
 
       // Update local store
       const profile: UserProfile = {
@@ -113,7 +94,7 @@ export default function Onboarding() {
         setError('Vui lòng chọn một tệp hình ảnh');
         return;
       }
-      
+
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setError('Hình ảnh không được vượt quá 5MB');
@@ -176,8 +157,8 @@ export default function Onboarding() {
             {/* Full Name */}
             <label className="block">
               <div className="text-sm font-medium mb-1">Họ và tên *</div>
-              <Input 
-                name="fullName" 
+              <Input
+                name="fullName"
                 placeholder="Nguyễn Văn A"
                 required
               />
@@ -186,8 +167,8 @@ export default function Onboarding() {
             {/* Phone */}
             <label className="block">
               <div className="text-sm font-medium mb-1">Số điện thoại</div>
-              <Input 
-                name="phone" 
+              <Input
+                name="phone"
                 type="tel"
                 placeholder="+84 9xx xxx xxx"
               />
@@ -196,8 +177,8 @@ export default function Onboarding() {
             {/* Date of Birth */}
             <label className="block">
               <div className="text-sm font-medium mb-1">Ngày sinh</div>
-              <Input 
-                name="dateOfBirth" 
+              <Input
+                name="dateOfBirth"
                 type="date"
               />
             </label>
@@ -241,8 +222,8 @@ export default function Onboarding() {
           {/* Bio */}
           <label className="block">
             <div className="text-sm font-medium mb-1">Tiểu sử cá nhân</div>
-            <textarea 
-              name="bio" 
+            <textarea
+              name="bio"
               placeholder="Viết gì đó về bạn..."
               className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows={3}
@@ -251,13 +232,13 @@ export default function Onboarding() {
 
           {/* Submit */}
           <div className="flex gap-2 pt-4">
-            <Button 
+            <Button
               type="submit"
               disabled={loading}
             >
               {loading ? 'Đang lưu...' : 'Hoàn tất'}
             </Button>
-            <Button 
+            <Button
               type="button"
               variant="ghost"
               onClick={() => navigate('/')}
