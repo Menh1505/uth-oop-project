@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/authenticate';
 import { UserService } from '../services/UserService';
 
-export class NewUserController {
+export class UserController {
   // Health check
   static async status(_req: AuthRequest, res: Response) {
     res.json({
