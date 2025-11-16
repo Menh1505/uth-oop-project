@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import Card from "../../components/ui/Card";
+import AdminLayout from "../../components/layout/AdminLayout";
 
 type AdminStats = {
   totalUsers: number;
@@ -85,12 +86,13 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) return <div className="p-8">Loading...</div>;
-  if (error) return <div className="p-8 text-red-600">{error}</div>;
+  if (loading) return <AdminLayout><div className="p-8">Loading...</div></AdminLayout>;
+  if (error) return <AdminLayout><div className="p-8 text-red-600">{error}</div></AdminLayout>;
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
+    <AdminLayout>
+      <div className="space-y-8">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
 
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -142,6 +144,7 @@ export default function AdminDashboard() {
           </table>
         </div>
       </Card>
-    </div>
+      </div>
+    </AdminLayout>
   );
 }

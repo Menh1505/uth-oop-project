@@ -18,6 +18,11 @@ const Menu = lazy(() => import("./pages/Menu"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const Order = lazy(() => import("./pages/Order"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminRestaurants = lazy(() => import("./pages/admin/Restaurants"));
+const AdminDeliveryPartners = lazy(() => import("./pages/admin/DeliveryPartners"));
+const AdminOrders = lazy(() => import("./pages/admin/Orders"));
+const AdminVouchers = lazy(() => import("./pages/admin/Vouchers"));
+const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const Shell = lazy(() => import("./components/layout/Shell"));
 const NotFound = () => <div className="p-6">404 — Không tìm thấy trang</div>;
 function FullScreenSpinner() {
@@ -145,8 +150,13 @@ export default function App() {
 
           {/* Admin area */}
           <Route element={<RequireRole role="admin" />}>
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/restaurants" element={<AdminRestaurants />} />
+            <Route path="/admin/delivery-partners" element={<AdminDeliveryPartners />} />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/vouchers" element={<AdminVouchers />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
           </Route>
 
           {/* User app */}
