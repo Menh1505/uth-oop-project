@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { errorHandler } from './middleware/errorHandler';
 import GoalRoutes from './routes/GoalRoutes';
@@ -15,7 +15,7 @@ app.use(express.json());
 app.use('/goals', GoalRoutes);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({
     service: 'goal-service',
     status: 'healthy',
@@ -28,7 +28,7 @@ app.get('/health', (req, res) => {
 app.use(errorHandler);
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use('*', (req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     message: 'Endpoint not found',

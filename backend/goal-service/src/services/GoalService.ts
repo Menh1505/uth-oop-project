@@ -131,7 +131,7 @@ export class GoalService {
     // Auto-complete goal if progress reaches 100%
     if (updateData.progress_percentage === 100 && updateData.status !== 'Completed') {
       updateData.status = 'Completed';
-      updateData.actual_completion_date = new Date();
+      updateData.actual_completion_date = new Date().toISOString();
     }
 
     // Validate status transitions
@@ -170,7 +170,7 @@ export class GoalService {
     // Auto-complete if reaches 100%
     if (progressPercentage >= 100) {
       updateData.status = 'Completed';
-      updateData.actual_completion_date = new Date();
+      updateData.actual_completion_date = new Date().toISOString();
     }
 
     return await this.updateUserGoal(userGoalId, updateData);
@@ -213,10 +213,14 @@ export class GoalService {
     // Sort by priority and success probability
     return recommendations
       .sort((a, b) => {
-        const priorityWeight = { High: 3, Medium: 2, Low: 1 };
-        const priorityScore = priorityWeight[b.priority] - priorityWeight[a.priority];
+        const priorityWeight: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
+        const bPriority = b.priority || 'Low';
+        const aPriority = a.priority || 'Low';
+        const priorityScore = (priorityWeight[bPriority] || 0) - (priorityWeight[aPriority] || 0);
         if (priorityScore !== 0) return priorityScore;
-        return b.success_probability - a.success_probability;
+        const bProb = b.success_probability || 0;
+        const aProb = a.success_probability || 0;
+        return bProb - aProb;
       })
       .slice(0, 5); // Return top 5 recommendations
   }
@@ -228,27 +232,24 @@ export class GoalService {
     }
 
     const suggestions: GoalAdjustmentSuggestion[] = [];
+    const targetMetrics = progress.target_metrics || {};
 
     // Analyze progress and suggest adjustments
     if (progress.progress_percentage < 25 && progress.days_remaining && progress.days_remaining > 0) {
       // Slow progress - suggest easier targets or extended timeline
       suggestions.push({
-        user_goal_id: userGoalId,
-        suggested_metrics: this.calculateEasierTargets(progress.target_metrics),
-        reasoning: 'Your current progress suggests the targets might be too ambitious. Consider adjusting to more achievable goals.',
-        adjustment_type: 'Decrease',
-        confidence_level: 80
+        suggestion_type: 'Decrease',
+        reason: 'Your current progress suggests the targets might be too ambitious. Consider adjusting to more achievable goals.',
+        suggested_metrics: this.calculateEasierTargets(targetMetrics)
       });
 
-      if (progress.target_metrics.duration_weeks) {
+      if (targetMetrics.duration_weeks) {
         suggestions.push({
-          user_goal_id: userGoalId,
+          suggestion_type: 'Modify Timeline',
+          reason: 'Extending the timeline by 30% may help you achieve your goals without compromising quality.',
           suggested_metrics: { 
-            duration_weeks: Math.ceil(progress.target_metrics.duration_weeks * 1.3) 
-          },
-          reasoning: 'Extending the timeline by 30% may help you achieve your goals without compromising quality.',
-          adjustment_type: 'Modify Timeline',
-          confidence_level: 85
+            duration_weeks: Math.ceil(targetMetrics.duration_weeks * 1.3) 
+          }
         });
       }
     }
@@ -256,22 +257,18 @@ export class GoalService {
     if (progress.progress_percentage > 75 && progress.days_remaining && progress.days_remaining > 14) {
       // Excellent progress - suggest more ambitious targets
       suggestions.push({
-        user_goal_id: userGoalId,
-        suggested_metrics: this.calculateMoreAmbitiousTargets(progress.target_metrics),
-        reasoning: 'You\'re ahead of schedule! Consider setting more challenging targets to maximize your progress.',
-        adjustment_type: 'Increase',
-        confidence_level: 70
+        suggestion_type: 'Increase',
+        reason: 'You\'re ahead of schedule! Consider setting more challenging targets to maximize your progress.',
+        suggested_metrics: this.calculateMoreAmbitiousTargets(targetMetrics)
       });
     }
 
-    if (!progress.is_on_track && progress.days_remaining && progress.days_remaining < 14) {
+    if (!progress.on_track && progress.days_remaining && progress.days_remaining < 14) {
       // Behind schedule with little time left - suggest strategy change
       suggestions.push({
-        user_goal_id: userGoalId,
-        suggested_metrics: progress.target_metrics,
-        reasoning: 'With limited time remaining, focus on the most impactful changes and consistency.',
-        adjustment_type: 'Change Strategy',
-        confidence_level: 75
+        suggestion_type: 'Change Strategy',
+        reason: 'With limited time remaining, focus on the most impactful changes and consistency.',
+        suggested_metrics: targetMetrics
       });
     }
 
@@ -282,26 +279,25 @@ export class GoalService {
     const templates: GoalTemplate[] = [
       {
         template_id: 'template-1',
-        name: 'Beginner Fat Loss',
+        template_name: 'Beginner Fat Loss',
         goal_type: 'Reduce Fat',
         default_metrics: {
           calories: 2000,
           duration_weeks: 12
         },
         description: 'A sustainable fat loss plan for beginners focusing on moderate calorie deficit.',
-        difficulty_level: 'Beginner',
-        estimated_duration_weeks: 12,
+        difficulty_level: 'Easy',
+        category: 'Weight Loss',
         tips: [
           'Create a moderate calorie deficit of 300-500 calories daily',
           'Focus on whole foods and reduce processed foods',
           'Include 3-4 cardio sessions per week',
           'Stay hydrated with 8-10 glasses of water daily'
-        ],
-        is_popular: true
+        ]
       },
       {
         template_id: 'template-2',
-        name: 'Muscle Building Foundation',
+        template_name: 'Muscle Building Foundation',
         goal_type: 'Build Muscle',
         default_metrics: {
           calories: 2500,
@@ -309,53 +305,50 @@ export class GoalService {
           duration_weeks: 16
         },
         description: 'Build lean muscle mass with proper nutrition and progressive training.',
-        difficulty_level: 'Intermediate',
-        estimated_duration_weeks: 16,
+        difficulty_level: 'Medium',
+        category: 'Fitness',
         tips: [
           'Eat in a slight calorie surplus (200-300 calories)',
           'Consume 1.6-2.2g protein per kg body weight',
           'Focus on compound movements',
           'Get adequate sleep for recovery'
-        ],
-        is_popular: true
+        ]
       },
       {
         template_id: 'template-3',
-        name: 'Weight Maintenance',
+        template_name: 'Weight Maintenance',
         goal_type: 'Maintain Weight',
         default_metrics: {
           calories: 2200,
           duration_weeks: 8
         },
         description: 'Maintain current weight while improving body composition.',
-        difficulty_level: 'Beginner',
-        estimated_duration_weeks: 8,
+        difficulty_level: 'Easy',
+        category: 'Nutrition',
         tips: [
           'Eat at maintenance calories',
           'Focus on consistent exercise routine',
           'Monitor weekly weigh-ins',
           'Prioritize strength training'
-        ],
-        is_popular: false
+        ]
       },
       {
         template_id: 'template-4',
-        name: 'Endurance Builder',
+        template_name: 'Endurance Builder',
         goal_type: 'Increase Endurance',
         default_metrics: {
           calories: 2400,
           duration_weeks: 12
         },
         description: 'Improve cardiovascular endurance and stamina.',
-        difficulty_level: 'Intermediate',
-        estimated_duration_weeks: 12,
+        difficulty_level: 'Medium',
+        category: 'Fitness',
         tips: [
           'Gradually increase cardio duration',
           'Include interval training',
           'Focus on carbohydrate timing',
           'Monitor heart rate zones'
-        ],
-        is_popular: false
+        ]
       }
     ];
 
@@ -395,19 +388,14 @@ export class GoalService {
       // High completion rate - suggest more challenging goals
       suggestions.push({
         suggested_goal_type: 'Build Muscle',
-        suggested_targets: {
+        reason: 'Your high completion rate suggests you\'re ready for more challenging muscle-building goals.',
+        recommended_metrics: {
           calories: 2600,
           protein: 150,
           duration_weeks: 16
         },
-        reasoning: 'Your high completion rate suggests you\'re ready for more challenging muscle-building goals.',
-        difficulty_level: 'Advanced',
-        expected_results: [
-          'Increase lean muscle mass by 2-4 lbs',
-          'Improve strength by 15-20%',
-          'Enhanced metabolic rate'
-        ],
-        timeline_suggestions: [12, 16, 20]
+        difficulty_level: 'Hard',
+        estimated_success_rate: 85
       });
     }
 
@@ -415,18 +403,13 @@ export class GoalService {
       // No active goals - suggest starter goals
       suggestions.push({
         suggested_goal_type: 'General Fitness',
-        suggested_targets: {
+        reason: 'Start with a balanced approach to establish healthy habits.',
+        recommended_metrics: {
           calories: 2200,
           duration_weeks: 8
         },
-        reasoning: 'Start with a balanced approach to establish healthy habits.',
-        difficulty_level: 'Beginner',
-        expected_results: [
-          'Establish consistent exercise routine',
-          'Improve energy levels',
-          'Better sleep quality'
-        ],
-        timeline_suggestions: [4, 8, 12]
+        difficulty_level: 'Easy',
+        estimated_success_rate: 90
       });
     }
 
@@ -434,19 +417,14 @@ export class GoalService {
     if (stats.most_common_goal_type === 'Reduce Fat') {
       suggestions.push({
         suggested_goal_type: 'Build Muscle',
-        suggested_targets: {
+        reason: 'Combining fat loss with muscle building will improve body composition.',
+        recommended_metrics: {
           calories: 2400,
           protein: 130,
           duration_weeks: 14
         },
-        reasoning: 'Combining fat loss with muscle building will improve body composition.',
-        difficulty_level: 'Intermediate',
-        expected_results: [
-          'Improved muscle definition',
-          'Higher metabolic rate',
-          'Better strength-to-weight ratio'
-        ],
-        timeline_suggestions: [10, 14, 18]
+        difficulty_level: 'Medium',
+        estimated_success_rate: 82
       });
     }
 
@@ -528,24 +506,22 @@ export class GoalService {
     return [
       {
         goal_type: 'General Fitness',
+        reason: 'Perfect starting point to establish healthy habits and build consistency.',
         recommended_metrics: {
           calories: 2200,
           duration_weeks: 8
         },
-        reasoning: 'Perfect starting point to establish healthy habits and build consistency.',
         priority: 'High',
-        estimated_duration_weeks: 8,
         success_probability: 90
       },
       {
         goal_type: 'Maintain Weight',
+        reason: 'Learn portion control and develop awareness of your eating patterns.',
         recommended_metrics: {
           calories: 2100,
           duration_weeks: 6
         },
-        reasoning: 'Learn portion control and develop awareness of your eating patterns.',
         priority: 'Medium',
-        estimated_duration_weeks: 6,
         success_probability: 85
       }
     ];
@@ -553,20 +529,21 @@ export class GoalService {
 
   private getComplementaryRecommendations(activeGoals: UserGoalWithGoal[], stats: GoalStatistics): GoalRecommendation[] {
     const recommendations: GoalRecommendation[] = [];
-    const activeGoalTypes = activeGoals.map(g => g.goal.goal_type);
+    const activeGoalTypes = activeGoals
+      .filter(g => g.goal !== undefined)
+      .map(g => g.goal!.goal_type);
 
     // If user has fat loss goal, suggest muscle building
     if (activeGoalTypes.includes('Reduce Fat') && !activeGoalTypes.includes('Build Muscle')) {
       recommendations.push({
         goal_type: 'Build Muscle',
+        reason: 'Adding muscle building to your fat loss goals will improve body composition.',
         recommended_metrics: {
           calories: 2400,
           protein: 130,
           duration_weeks: 12
         },
-        reasoning: 'Adding muscle building to your fat loss goals will improve body composition.',
         priority: 'High',
-        estimated_duration_weeks: 12,
         success_probability: 75
       });
     }
@@ -575,13 +552,12 @@ export class GoalService {
     if (activeGoalTypes.includes('Build Muscle') && !activeGoalTypes.includes('Increase Endurance')) {
       recommendations.push({
         goal_type: 'Increase Endurance',
+        reason: 'Improve cardiovascular health while maintaining muscle gains.',
         recommended_metrics: {
           calories: 2500,
           duration_weeks: 10
         },
-        reasoning: 'Improve cardiovascular health while maintaining muscle gains.',
         priority: 'Medium',
-        estimated_duration_weeks: 10,
         success_probability: 70
       });
     }
@@ -595,14 +571,13 @@ export class GoalService {
     if (stats.most_common_goal_type === 'General Fitness' && stats.completed_goals >= 2) {
       recommendations.push({
         goal_type: 'Build Muscle',
+        reason: 'You\'ve mastered the basics. Time to focus on building lean muscle mass.',
         recommended_metrics: {
           calories: 2500,
           protein: 140,
           duration_weeks: 14
         },
-        reasoning: 'You\'ve mastered the basics. Time to focus on building lean muscle mass.',
         priority: 'High',
-        estimated_duration_weeks: 14,
         success_probability: 80
       });
     }

@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool } from '../../node_modules/@types/pg';
 import { 
   Exercise, 
   CreateExercisePayload, 
@@ -282,27 +282,23 @@ export class ExerciseRepository {
 
     return {
       total_exercises: parseInt(basicStats.total_exercises),
+      total_duration: parseFloat(basicStats.total_duration_minutes),
       total_duration_minutes: parseFloat(basicStats.total_duration_minutes),
-      total_calories_burned: parseFloat(basicStats.total_calories_burned),
-      average_duration: parseFloat(basicStats.average_duration),
-      average_calories_per_exercise: parseFloat(basicStats.average_calories_per_exercise),
-      exercise_types_breakdown: typesResult.rows.map(row => ({
-        type: row.type,
-        count: parseInt(row.count),
-        total_calories: parseFloat(row.total_calories),
-        total_duration: parseFloat(row.total_duration)
+      total_calories: parseFloat(basicStats.total_calories_burned),
+      average_intensity: 'Medium',
+      most_common_type: 'General',
+      exercise_types_breakdown: typesResult.rows.map((row: any) => ({
+        type: row.exercise_type,
+        count: row.count
       })),
-      weekly_summary: weeklyResult.rows.map(row => ({
-        week_start: row.week_start,
-        exercise_count: parseInt(row.exercise_count),
-        total_calories: parseFloat(row.total_calories),
-        total_duration: parseFloat(row.total_duration)
+      weekly_summary: weeklyResult.rows.map((row: any) => ({
+        week: row.week,
+        count: row.count,
+        calories: row.total_calories
       })),
-      most_common_exercises: commonExercisesResult.rows.map(row => ({
-        exercise_name: row.exercise_name,
-        count: parseInt(row.count),
-        total_calories: parseFloat(row.total_calories),
-        average_calories: parseFloat(row.average_calories)
+      most_common_exercises: commonExercisesResult.rows.map((row: any) => ({
+        name: row.exercise_name,
+        count: row.count
       }))
     };
   }
@@ -341,10 +337,10 @@ export class ExerciseRepository {
       date,
       exercises,
       total_exercises: parseInt(summary.total_exercises),
+      total_duration: parseFloat(summary.total_duration_minutes),
       total_duration_minutes: parseFloat(summary.total_duration_minutes),
-      total_calories_burned: parseFloat(summary.total_calories_burned),
-      exercise_types: summary.exercise_types || [],
-      average_intensity: averageIntensity
+      total_calories: parseFloat(summary.total_calories_burned),
+      exercise_types: summary.exercise_types || []
     };
   }
 
@@ -371,11 +367,10 @@ export class ExerciseRepository {
     `;
     const historyResult = await this.pool.query(historyQuery, [userId, exerciseName]);
 
-    const performance_history = historyResult.rows.map(row => ({
-      date: row.date,
-      duration_minutes: row.duration_minutes,
-      calories_burned: row.calories_burned,
-      distance: row.distance,
+    const performance_history = historyResult.rows.map((row: any) => ({
+      date: row.exercise_date,
+      duration: row.duration_minutes,
+      calories: row.calories_burned,
       sets: row.sets,
       reps: row.reps,
       weight_kg: row.weight_kg,
@@ -388,6 +383,11 @@ export class ExerciseRepository {
 
     return {
       exercise_name: exerciseName,
+      total_sessions: performance_history.length,
+      total_duration: performance_history.reduce((sum: number, h: any) => sum + (h.duration || 0), 0),
+      average_calories_per_session: performance_history.length > 0 ? Math.round(performance_history.reduce((sum: number, h: any) => sum + (h.calories || 0), 0) / performance_history.length) : 0,
+      best_performance: 'Unknown',
+      trend: 'stable' as const,
       performance_history,
       progress_analysis,
       recommendations: this.generatePerformanceRecommendations(progress_analysis)
@@ -406,7 +406,7 @@ export class ExerciseRepository {
       LIMIT $1
     `;
     const result = await this.pool.query(query, [limit]);
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       exercise_name: row.exercise_name,
       usage_count: parseInt(row.usage_count)
     }));

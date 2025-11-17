@@ -4,22 +4,24 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Install pnpm (dùng corepack cho chuẩn, hoặc npm -g cũng được)
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
-# Install all dependencies (including dev dependencies for building)
-RUN npm ci
+# Copy package files (NHỚ có pnpm-lock.yaml)
+COPY package.json pnpm-lock.yaml ./
+
+# Install all dependencies (including dev deps for building)
+RUN pnpm install --frozen-lockfile
 
 # Copy TypeScript config and source code
 COPY tsconfig.json ./
 COPY src ./src
 
-# Install TypeScript globally and build
-RUN npm install -g typescript
-RUN npm run build
+# Build
+RUN pnpm run build
 
 # Remove dev dependencies to reduce image size
-RUN npm ci --only=production
+RUN pnpm prune --prod
 
 # Create logs directory
 RUN mkdir -p logs
@@ -44,4 +46,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     req.end();"
 
 # Start the application
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]

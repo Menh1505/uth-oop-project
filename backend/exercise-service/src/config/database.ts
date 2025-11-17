@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool } from '../../node_modules/@types/pg';
 
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',

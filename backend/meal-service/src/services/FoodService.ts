@@ -170,14 +170,14 @@ export class FoodService {
       protein: Math.round(food.protein * ratio * 100) / 100,
       carbs: Math.round(food.carbs * ratio * 100) / 100,
       fat: Math.round(food.fat * ratio * 100) / 100,
-      fiber: Math.round(food.fiber * ratio * 100) / 100,
-      sugar: Math.round(food.sugar * ratio * 100) / 100,
-      sodium: Math.round(food.sodium * ratio * 100) / 100,
-      cholesterol: Math.round(food.cholesterol * ratio * 100) / 100,
-      vitamin_a: Math.round(food.vitamin_a * ratio * 100) / 100,
-      vitamin_c: Math.round(food.vitamin_c * ratio * 100) / 100,
-      calcium: Math.round(food.calcium * ratio * 100) / 100,
-      iron: Math.round(food.iron * ratio * 100) / 100
+      fiber: Math.round((food.fiber || 0) * ratio * 100) / 100,
+      sugar: Math.round((food.sugar || 0) * ratio * 100) / 100,
+      sodium: Math.round((food.sodium || 0) * ratio * 100) / 100,
+      cholesterol: Math.round((food.cholesterol || 0) * ratio * 100) / 100,
+      vitamin_a: Math.round((food.vitamin_a || 0) * ratio * 100) / 100,
+      vitamin_c: Math.round((food.vitamin_c || 0) * ratio * 100) / 100,
+      calcium: Math.round((food.calcium || 0) * ratio * 100) / 100,
+      iron: Math.round((food.iron || 0) * ratio * 100) / 100
     };
   }
 

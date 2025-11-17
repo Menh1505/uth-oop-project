@@ -1,8 +1,9 @@
 import { Router } from 'express';
+import type { Router as ExpressRouter } from 'express';
 import { PaymentController } from '../controllers/PaymentController';
 import { authenticateToken } from '../middleware/authenticate';
 
-const router = Router();
+const router: ExpressRouter = Router();
 const paymentController = new PaymentController();
 
 // Public routes

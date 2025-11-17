@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient } from '../../node_modules/@types/pg';
 import pool from '../config/database';
 import {
   Goal,
@@ -327,6 +327,12 @@ export class GoalRepository {
 
     return {
       goals,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        total_pages: totalPages
+      },
       total_count: totalCount,
       current_page: page,
       total_pages: totalPages,
@@ -396,6 +402,7 @@ export class GoalRepository {
     const monthlyResult = await this.pool.query(monthlyQuery, [userId]);
     const monthlyProgress: MonthlyGoalProgress[] = monthlyResult.rows.map(row => ({
       month: row.month,
+      goals_created: parseInt(row.goals_started || 0),
       goals_started: parseInt(row.goals_started),
       goals_completed: parseInt(row.goals_completed),
       average_progress: parseFloat(row.average_progress) || 0
@@ -417,6 +424,7 @@ export class GoalRepository {
       paused_goals: parseInt(stats.paused_goals),
       cancelled_goals: parseInt(stats.cancelled_goals),
       completion_rate: Math.round(completionRate * 100) / 100,
+      average_progress: Math.round(parseFloat(stats.avg_progress || 0) * 100) / 100,
       average_completion_time_days: stats.avg_completion_days ? Math.round(parseFloat(stats.avg_completion_days)) : undefined,
       most_common_goal_type: mostCommonGoalType,
       goals_by_type: goalsByType,
@@ -462,16 +470,12 @@ export class GoalRepository {
     };
 
     // Generate recommendations based on progress
-    const recommendations = this.generateProgressRecommendations(
-      userGoal.goal_type,
-      parseFloat(userGoal.progress_percentage),
-      daysRemaining
-    );
-
+    const daysActive = currentMetrics.days_active || 1;
+    
     // Estimate completion date based on current progress
     let estimatedCompletionDate: Date | undefined;
     if (userGoal.progress_percentage > 0 && daysRemaining) {
-      const progressRate = parseFloat(userGoal.progress_percentage) / currentMetrics.days_active;
+      const progressRate = parseFloat(userGoal.progress_percentage) / daysActive;
       const estimatedDaysToComplete = 100 / progressRate;
       estimatedCompletionDate = new Date();
       estimatedCompletionDate.setDate(estimatedCompletionDate.getDate() + estimatedDaysToComplete);
@@ -479,7 +483,7 @@ export class GoalRepository {
 
     // Determine if on track
     const isOnTrack = daysRemaining 
-      ? (parseFloat(userGoal.progress_percentage) / 100) >= ((currentMetrics.days_active) / (currentMetrics.days_active + daysRemaining))
+      ? (parseFloat(userGoal.progress_percentage) / 100) >= (daysActive / (daysActive + daysRemaining))
       : parseFloat(userGoal.progress_percentage) > 50;
 
     return {
@@ -497,8 +501,7 @@ export class GoalRepository {
       progress_percentage: parseFloat(userGoal.progress_percentage),
       days_remaining: daysRemaining,
       estimated_completion_date: estimatedCompletionDate,
-      is_on_track: isOnTrack,
-      recommendations
+      on_track: isOnTrack
     };
   }
 

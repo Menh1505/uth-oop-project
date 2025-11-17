@@ -287,22 +287,24 @@ export class ExerciseService {
       }
 
       // Skip if exercise name is in exclude list
-      if (criteria.exclude_exercises?.some(excluded => 
+      if (criteria.exclude_exercises?.some((excluded: string) => 
         excluded.toLowerCase() === baseRec.exercise_name.toLowerCase())) {
         continue;
       }
 
       // Adjust recommendation based on available duration
       if (criteria.available_duration_minutes) {
+        const currentDuration = baseRec.recommended_duration_minutes || baseRec.recommended_duration || 30;
         baseRec.recommended_duration_minutes = Math.min(
-          baseRec.recommended_duration_minutes,
+          currentDuration,
           criteria.available_duration_minutes
         );
+        baseRec.recommended_duration = baseRec.recommended_duration_minutes;
         
         // Recalculate calories based on adjusted duration
         baseRec.estimated_calories_burned = await this.estimateCaloriesBurned(
           baseRec.exercise_type,
-          baseRec.recommended_duration_minutes,
+          baseRec.recommended_duration_minutes || 30,
           baseRec.recommended_intensity,
           { user_weight_kg: 70 } // Should be fetched from user profile
         );
@@ -321,7 +323,7 @@ export class ExerciseService {
 
     // Sort by match score and return top recommendations
     return recommendations
-      .sort((a, b) => b.match_score - a.match_score)
+      .sort((a, b) => (b.match_score || 0) - (a.match_score || 0))
       .slice(0, 10);
   }
 
@@ -374,7 +376,8 @@ export class ExerciseService {
     const met = metValues[exerciseType]?.[intensity] || 5.0;
     
     // Calories = MET × weight (kg) × duration (hours)
-    const calories = met * factors.user_weight_kg * (durationMinutes / 60);
+    const weight = factors.user_weight_kg || 70; // Default 70kg if not provided
+    const calories = met * weight * (durationMinutes / 60);
     
     // Apply age and gender adjustments
     let adjustmentFactor = 1.0;
@@ -427,7 +430,9 @@ export class ExerciseService {
       recommendations.push({
         exercise_name: 'Brisk Walking',
         exercise_type: 'Cardio',
+        recommended_duration: 30,
         recommended_duration_minutes: 30,
+        calories_estimate: 150,
         estimated_calories_burned: 150,
         recommended_intensity: 'Medium',
         description: 'A low-impact cardiovascular exercise suitable for all fitness levels',
@@ -447,7 +452,9 @@ export class ExerciseService {
       recommendations.push({
         exercise_name: 'Running',
         exercise_type: 'Cardio',
+        recommended_duration: 25,
         recommended_duration_minutes: 25,
+        calories_estimate: 250,
         estimated_calories_burned: 250,
         recommended_intensity: 'High',
         description: 'High-intensity cardiovascular exercise for building endurance and burning calories',
@@ -467,7 +474,9 @@ export class ExerciseService {
       recommendations.push({
         exercise_name: 'Cycling',
         exercise_type: 'Cardio',
+        recommended_duration: 35,
         recommended_duration_minutes: 35,
+        calories_estimate: 200,
         estimated_calories_burned: 200,
         recommended_intensity: 'Medium',
         description: 'Low-impact cycling exercise that builds leg strength and cardiovascular fitness',
@@ -490,7 +499,9 @@ export class ExerciseService {
       recommendations.push({
         exercise_name: 'Push-ups',
         exercise_type: 'Strength',
+        recommended_duration: 15,
         recommended_duration_minutes: 15,
+        calories_estimate: 70,
         estimated_calories_burned: 70,
         recommended_intensity: 'Medium',
         recommended_sets: 3,
@@ -512,7 +523,9 @@ export class ExerciseService {
       recommendations.push({
         exercise_name: 'Squats',
         exercise_type: 'Strength',
+        recommended_duration: 15,
         recommended_duration_minutes: 15,
+        calories_estimate: 80,
         estimated_calories_burned: 80,
         recommended_intensity: 'Medium',
         recommended_sets: 3,
@@ -534,7 +547,9 @@ export class ExerciseService {
       recommendations.push({
         exercise_name: 'Plank',
         exercise_type: 'Strength',
+        recommended_duration: 10,
         recommended_duration_minutes: 10,
+        calories_estimate: 50,
         estimated_calories_burned: 50,
         recommended_intensity: 'Medium',
         description: 'Isometric core strengthening exercise',
@@ -557,7 +572,9 @@ export class ExerciseService {
       recommendations.push({
         exercise_name: 'Full Body Stretching',
         exercise_type: 'Flexibility',
+        recommended_duration: 20,
         recommended_duration_minutes: 20,
+        calories_estimate: 60,
         estimated_calories_burned: 60,
         recommended_intensity: 'Low',
         description: 'Comprehensive stretching routine to improve flexibility and mobility',
@@ -597,7 +614,7 @@ export class ExerciseService {
 
     // Duration match
     if (criteria.available_duration_minutes) {
-      const durationDiff = Math.abs(recommendation.recommended_duration_minutes - criteria.available_duration_minutes);
+      const durationDiff = Math.abs((recommendation.recommended_duration_minutes || recommendation.recommended_duration) - criteria.available_duration_minutes);
       if (durationDiff <= 5) score += 15;
       else if (durationDiff <= 15) score += 10;
       else if (durationDiff <= 30) score += 5;
@@ -610,7 +627,7 @@ export class ExerciseService {
 
     // Equipment availability
     if (criteria.equipment_available) {
-      const hasRequiredEquipment = recommendation.equipment_needed.every(equipment => 
+      const hasRequiredEquipment = recommendation.equipment_needed.every((equipment: string) => 
         criteria.equipment_available!.includes(equipment) || equipment === 'None (bodyweight)'
       );
       if (hasRequiredEquipment) {
@@ -641,7 +658,7 @@ export class ExerciseService {
 
     // Calorie target
     if (criteria.target_calories) {
-      const calorieDiff = Math.abs(recommendation.estimated_calories_burned - criteria.target_calories);
+      const calorieDiff = Math.abs((recommendation.estimated_calories_burned || recommendation.calories_estimate) - criteria.target_calories);
       const percentageDiff = (calorieDiff / criteria.target_calories) * 100;
       if (percentageDiff <= 10) score += 15;
       else if (percentageDiff <= 25) score += 10;
