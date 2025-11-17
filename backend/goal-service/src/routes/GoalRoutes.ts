@@ -16,6 +16,13 @@ const goalController = new GoalController();
 router.post('/', authenticate, goalController.createGoal);
 
 /**
+ * @route GET /goals
+ * @description List all goals
+ * @access Private
+ */
+router.get('/', authenticate, goalController.getGoals);
+
+/**
  * @route GET /goals/:goalId
  * @description Get goal by ID
  * @access Public

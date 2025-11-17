@@ -12,6 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+      - ./migrations:/migrations:ro
     networks:
       - backend
     healthcheck:
@@ -59,13 +60,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - auth-service
-      - user-service
-      - meal-service
-      - exercise-service
-      - goal-service
-      - recommendation-service
-      - payment-service
+      - postgres
+      - rabbitmq
     networks:
       - backend
     restart: unless-stopped
@@ -114,93 +110,104 @@ services:
     networks:
       - backend
 
-  # meal-service:
-  #   build: ./meal-service
-  #   expose:
-  #     - "3004"
-  #   environment:
-  #     DB_HOST: postgres
-  #     DB_PORT: 5432
-  #     DB_USER: postgres
-  #     DB_PASSWORD: uth
-  #     DB_NAME: fitfood_meal_db
-  #     NODE_ENV: development
-  #     PORT: 3004
-  #     RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-  #     JWT_SECRET: shared-secret
-  #   networks:
-  #     - backend
+  meal-service:
+    build: ./meal-service
+    expose:
+      - "3004"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitfood_meal_db
+      NODE_ENV: development
+      PORT: 3004
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      JWT_SECRET: shared-secret
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - backend
 
-  # exercise-service:
-  #   build: ./exercise-service
-  #   expose:
-  #     - "3005"
-  #   environment:
-  #     DB_HOST: postgres
-  #     DB_PORT: 5432
-  #     DB_USER: postgres
-  #     DB_PASSWORD: uth
-  #     DB_NAME: fitfood_exercise_db
-  #     NODE_ENV: development
-  #     PORT: 3005
-  #     RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-  #     JWT_SECRET: shared-secret
-  #   networks:
-  #     - backend
+  exercise-service:
+    build: ./exercise-service
+    expose:
+      - "3005"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitfood_exercise_db
+      NODE_ENV: development
+      PORT: 3005
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      JWT_SECRET: shared-secret
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - backend
 
-  # goal-service:
-  #   build: ./goal-service
-  #   expose:
-  #     - "3006"
-  #   environment:
-  #     DB_HOST: postgres
-  #     DB_PORT: 5432
-  #     DB_USER: postgres
-  #     DB_PASSWORD: uth
-  #     DB_NAME: fitfood_goal_db
-  #     NODE_ENV: development
-  #     PORT: 3006
-  #     RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-  #     JWT_SECRET: shared-secret
-  #   networks:
-  #     - backend
+  goal-service:
+    build: ./goal-service
+    expose:
+      - "3006"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitfood_goal_db
+      NODE_ENV: development
+      PORT: 3006
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      JWT_SECRET: shared-secret
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - backend
 
-  # recommendation-service:
-  #   build: ./recommendation-service
-  #   expose:
-  #     - "3007"
-  #   environment:
-  #     DB_HOST: postgres
-  #     DB_PORT: 5432
-  #     DB_USER: postgres
-  #     DB_PASSWORD: uth
-  #     DB_NAME: fitfood_reco_db
-  #     NODE_ENV: development
-  #     PORT: 3007
-  #     OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-  #     PAYMENT_SERVICE_URL: http://payment-service:3008
-  #     JWT_SECRET: shared-secret
-  #   depends_on:
-  #     - postgres
-  #     - payment-service
-  #   networks:
-  #     - backend
+  recommendation-service:
+    build: ./recommendation-service
+    expose:
+      - "3007"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitfood_reco_db
+      NODE_ENV: development
+      PORT: 3007
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PAYMENT_SERVICE_URL: http://payment-service:3008
+      JWT_SECRET: shared-secret
+    depends_on:
+      - postgres
+    networks:
+      - backend
 
-  # payment-service:
-  #   build: ./payment-service
-  #   expose:
-  #     - "3008"
-  #   environment:
-  #     DB_HOST: postgres
-  #     DB_PORT: 5432
-  #     DB_USER: postgres
-  #     DB_PASSWORD: uth
-  #     DB_NAME: fitfood_payment_db
-  #     NODE_ENV: development
-  #     PORT: 3008
-  #     JWT_SECRET: shared-secret
-  #   networks:
-  #     - backend
+  payment-service:
+    build: ./payment-service
+    expose:
+      - "3008"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitfood_payment_db
+      NODE_ENV: development
+      PORT: 3008
+      JWT_SECRET: shared-secret
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - backend
 
   # ==========================
   # Observability Stack

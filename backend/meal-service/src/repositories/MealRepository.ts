@@ -67,6 +67,7 @@ export class MealRepository {
     const foodsResult = await this.pool.query(foodsQuery, [mealId]);
 
     const foods: MealFoodWithDetails[] = foodsResult.rows.map(row => ({
+      id: row.meal_food_id,
       meal_food_id: row.meal_food_id,
       meal_id: row.meal_id,
       food_id: row.food_id,
@@ -79,9 +80,11 @@ export class MealRepository {
       notes: row.notes,
       created_at: row.created_at,
       food: {
+        id: row.food_id,
         food_id: row.food_id,
         food_name: row.food_name,
         brand: row.brand,
+        category: row.category || 'uncategorized',
         serving_size: row.serving_size,
         serving_unit: row.serving_unit,
         calories: row.calories,
@@ -375,7 +378,12 @@ export class MealRepository {
       total_sugar: parseFloat(detailedData.total_sugar) || 0,
       total_sodium: parseFloat(detailedData.total_sodium) || 0,
       total_cholesterol: parseFloat(detailedData.total_cholesterol) || 0,
-      meal_count: parseInt(nutritionData.meal_count) || 0
+      macro_breakdown: {
+        protein_percentage: (parseFloat(detailedData.total_protein) / parseFloat(detailedData.total_calories)) * 100 || 0,
+        carbs_percentage: (parseFloat(detailedData.total_carbs) / parseFloat(detailedData.total_calories)) * 100 || 0,
+        fat_percentage: (parseFloat(detailedData.total_fat) / parseFloat(detailedData.total_calories)) * 100 || 0
+      },
+      meals_count: parseInt(nutritionData.meal_count) || 0
     };
   }
 
@@ -414,7 +422,11 @@ export class MealRepository {
       total_sugar: parseFloat(data.total_sugar) || 0,
       total_sodium: parseFloat(data.total_sodium) || 0,
       total_cholesterol: parseFloat(data.total_cholesterol) || 0,
-      meal_count: parseInt(data.meal_count) || 0
+      macro_breakdown: {
+        protein_percentage: (parseFloat(data.total_protein) / parseFloat(data.total_calories)) * 100 || 0,
+        carbs_percentage: (parseFloat(data.total_carbs) / parseFloat(data.total_calories)) * 100 || 0,
+        fat_percentage: (parseFloat(data.total_fat) / parseFloat(data.total_calories)) * 100 || 0
+      }
     };
   }
 

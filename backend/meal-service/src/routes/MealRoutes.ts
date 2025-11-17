@@ -9,6 +9,7 @@ router.get('/status', MealController.status);
 
 // Meal CRUD routes (all require auth)
 router.post('/', authenticate, MealController.createMeal);
+router.get('/', authenticate, MealController.getMeals); // List meals
 router.get('/:mealId', authenticate, MealController.getMeal);
 router.put('/:mealId', authenticate, MealController.updateMeal);
 router.delete('/:mealId', authenticate, MealController.deleteMeal);

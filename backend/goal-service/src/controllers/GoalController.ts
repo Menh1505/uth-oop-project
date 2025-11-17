@@ -45,6 +45,29 @@ export class GoalController {
     }
   };
 
+  getGoals = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const goals = await this.goalService.getAllGoals();
+      
+      const response: GoalApiResponse<typeof goals> = {
+        success: true,
+        data: goals,
+        message: 'Goals retrieved successfully',
+        timestamp: new Date()
+      };
+      
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error fetching goals:', error);
+      const response: GoalApiResponse<null> = {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch goals',
+        timestamp: new Date()
+      };
+      res.status(400).json(response);
+    }
+  };
+
   getGoalById = async (req: Request, res: Response): Promise<void> => {
     try {
       const { goalId } = req.params;

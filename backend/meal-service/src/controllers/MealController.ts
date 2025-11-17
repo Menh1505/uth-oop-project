@@ -29,6 +29,34 @@ export class MealController {
     });
   }
 
+  // List all meals for user
+  static async getMeals(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ 
+          success: false,
+          message: 'User not authenticated' 
+        });
+      }
+
+      const meals = await MealService.getUserMeals(userId);
+      
+      res.json({
+        success: true,
+        count: meals?.length || 0,
+        meals: meals || []
+      });
+    } catch (error: any) {
+      console.error('Get meals error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch meals',
+        error: error.message
+      });
+    }
+  }
+
   // Create new meal
   static async createMeal(req: AuthRequest, res: Response) {
     try {

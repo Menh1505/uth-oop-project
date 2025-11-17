@@ -2,7 +2,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import { jwtConfig } from '../config/jwt';
-import { MessageService } from './messageService';
+// RabbitMQ disabled - causes crashes on startup
+// Using stub implementation instead
+import { MessageService } from './messageServiceStub';
 import {
   signAccess, generateRefreshToken, hashOpaqueToken, compareOpaqueToken
 } from '../utils/tokens';
