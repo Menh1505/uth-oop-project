@@ -4,7 +4,7 @@ import pool from '../config/database';
 import { jwtConfig } from '../config/jwt';
 // RabbitMQ disabled - causes crashes on startup
 // Using stub implementation instead
-import { MessageService } from './messageServiceStub';
+import { MessageService } from './messageService';
 import {
   signAccess, generateRefreshToken, hashOpaqueToken, compareOpaqueToken
 } from '../utils/tokens';

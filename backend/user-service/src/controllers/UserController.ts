@@ -84,21 +84,37 @@ export class UserController {
   static async getMe(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
-      if (!userId) {
+      const email = req.user?.email;
+      if (!userId || !email) {
         return res.status(401).json({ 
           success: false,
           message: 'User not authenticated' 
         });
       }
 
-      const user = await UserService.getUserProfile(userId);
-      const needsOnboarding = await UserService.needsOnboarding(userId);
+      try {
+        const user = await UserService.getUserProfile(userId);
+        const needsOnboarding = await UserService.needsOnboarding(userId);
 
-      res.json({
-        success: true,
-        user,
-        needsOnboarding
-      });
+        res.json({
+          success: true,
+          user,
+          needsOnboarding
+        });
+      } catch (err: any) {
+        if (err.message === 'User not found') {
+          // User doesn't exist in user_db, create it with email from JWT
+          const newUser = await UserService.createUserWithEmail(userId, email);
+          const needsOnboarding = await UserService.needsOnboarding(userId);
+          res.json({
+            success: true,
+            user: newUser,
+            needsOnboarding
+          });
+        } else {
+          throw err;
+        }
+      }
     } catch (error: any) {
       console.error('getMe error:', error);
       res.status(500).json({

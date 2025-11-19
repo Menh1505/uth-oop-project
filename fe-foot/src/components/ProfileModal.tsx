@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import Button from './ui/Button';
-import { Input } from './ui/Input';
-import type { UserProfile } from '../types';
+import { useState } from "react";
+import Button from "./ui/Button";
+import { Input } from "./ui/Input";
+import type { UserProfile } from "../types";
 
 interface ProfileModalProps {
   profile: UserProfile | null;
@@ -10,22 +10,29 @@ interface ProfileModalProps {
   onUpdate: (profile: Partial<UserProfile>) => Promise<void>;
 }
 
-export default function ProfileModal({ profile, isOpen, onClose, onUpdate }: ProfileModalProps) {
+export default function ProfileModal({
+  profile,
+  isOpen,
+  onClose,
+  onUpdate,
+}: ProfileModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: profile?.name || '',
-    email: profile?.email || '',
-    phone: profile?.phone || '',
-    bio: profile?.bio || '',
+    name: profile?.name || "",
+    email: profile?.email || "",
+    phone: profile?.phone || "",
+    bio: profile?.bio || "",
   });
 
   if (!isOpen || !profile) return null;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async () => {
@@ -40,7 +47,7 @@ export default function ProfileModal({ profile, isOpen, onClose, onUpdate }: Pro
       });
       setIsEditing(false);
     } catch (err: any) {
-      setError(err.message || 'Cập nhật thất bại');
+      setError(err.message || "Cập nhật thất bại");
     } finally {
       setLoading(false);
     }
@@ -50,172 +57,224 @@ export default function ProfileModal({ profile, isOpen, onClose, onUpdate }: Pro
     <>
       {/* Modal Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40"
+        className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-2xl z-50 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b flex items-center justify-between p-4">
-          <h2 className="text-xl font-bold">Hồ Sơ Cá Nhân</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 space-y-4">
-          {error && (
-            <div className="p-3 bg-red-100 text-red-700 rounded">
-              {error}
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900/95 text-slate-50 shadow-2xl shadow-black/60 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/80 px-5 py-4">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">
+                Hồ Sơ Cá Nhân
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-400">
+                Quản lý thông tin tài khoản FitFood của bạn
+              </p>
             </div>
-          )}
-
-          {/* Avatar Section */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center overflow-hidden">
-              {profile.avatar ? (
-                <img
-                  src={profile.avatar}
-                  alt={profile.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="text-white text-3xl">👤</div>
-              )}
-            </div>
-            {!isEditing && (
-              <Button
-                type="button"
-                onClick={() => setIsEditing(true)}
-              >
-                Chỉnh sửa hồ sơ
-              </Button>
-            )}
+            <button
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700/70 bg-slate-900 text-slate-400 text-base hover:bg-slate-800 hover:text-slate-100 transition"
+            >
+              ✕
+            </button>
           </div>
 
-          {/* Profile Info */}
-          {isEditing ? (
-            // Edit Mode
-            <div className="space-y-3">
-              <label className="block">
-                <div className="text-sm font-medium mb-1">Tên</div>
-                <Input
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="Tên của bạn"
-                />
-              </label>
-
-              <label className="block">
-                <div className="text-sm font-medium mb-1">Email</div>
-                <Input
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="email@example.com"
-                />
-              </label>
-
-              <label className="block">
-                <div className="text-sm font-medium mb-1">Số điện thoại</div>
-                <Input
-                  name="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  placeholder="+84 9xx xxx xxx"
-                />
-              </label>
-
-              <label className="block">
-                <div className="text-sm font-medium mb-1">Tiểu sử</div>
-                <textarea
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleInputChange}
-                  placeholder="Viết gì đó về bạn..."
-                  className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                />
-              </label>
-
-              <div className="flex gap-2 pt-3">
-                <Button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={loading}
-                >
-                  {loading ? 'Đang lưu...' : 'Lưu'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setFormData({
-                      name: profile.name,
-                      email: profile.email || '',
-                      phone: profile.phone || '',
-                      bio: profile.bio || '',
-                    });
-                  }}
-                >
-                  Hủy
-                </Button>
+          {/* Content */}
+          <div className="px-5 py-4 space-y-4">
+            {error && (
+              <div className="flex items-start gap-2 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                <span className="mt-[2px] text-base">⚠️</span>
+                <p>{error}</p>
               </div>
-            </div>
-          ) : (
-            // View Mode
-            <div className="space-y-3">
-              <div>
-                <div className="text-sm font-medium text-gray-600">Tên</div>
-                <div className="text-lg font-semibold">{profile.name}</div>
-              </div>
+            )}
 
-              {profile.email && (
-                <div>
-                  <div className="text-sm font-medium text-gray-600">Email</div>
-                  <div className="text-gray-700">{profile.email}</div>
-                </div>
-              )}
-
-              {profile.phone && (
-                <div>
-                  <div className="text-sm font-medium text-gray-600">Số điện thoại</div>
-                  <div className="text-gray-700">{profile.phone}</div>
-                </div>
-              )}
-
-              {profile.bio && (
-                <div>
-                  <div className="text-sm font-medium text-gray-600">Tiểu sử</div>
-                  <div className="text-gray-700 whitespace-pre-wrap">{profile.bio}</div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3 pt-3">
-                <div className="bg-blue-50 rounded p-3">
-                  <div className="text-xs text-gray-600">Mục tiêu</div>
-                  <div className="font-semibold text-blue-600 capitalize">
-                    {profile.goal}
+            {/* Avatar Section */}
+            <div className="flex flex-col items-center gap-3 pb-4 border-b border-slate-800/70">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-400 via-sky-500 to-indigo-500 p-[3px] shadow-lg shadow-emerald-500/30">
+                  <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
+                    {profile.avatar ? (
+                      <img
+                        src={profile.avatar}
+                        alt={profile.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-3xl">👤</div>
+                    )}
                   </div>
                 </div>
-                <div className="bg-green-50 rounded p-3">
-                  <div className="text-xs text-gray-600">Chế độ ăn</div>
-                  <div className="font-semibold text-green-600 capitalize">
-                    {profile.diet}
+                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[11px] rounded-full bg-slate-900 px-3 py-1 border border-slate-700 text-slate-200 shadow-sm">
+                  Ảnh đại diện
+                </div>
+              </div>
+
+              {!isEditing && (
+                <Button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="mt-4 h-9 rounded-xl px-4 text-sm font-medium bg-sky-500 hover:bg-sky-400 shadow-sm"
+                >
+                  Chỉnh sửa hồ sơ
+                </Button>
+              )}
+            </div>
+
+            {/* Profile Info */}
+            {isEditing ? (
+              // Edit Mode
+              <div className="space-y-3 pt-1">
+                <label className="block space-y-1">
+                  <div className="text-xs font-medium tracking-wide text-slate-300 uppercase">
+                    Tên
+                  </div>
+                  <Input
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Tên của bạn"
+                    className="h-10 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
+                  />
+                </label>
+
+                <label className="block space-y-1">
+                  <div className="text-xs font-medium tracking-wide text-slate-300 uppercase">
+                    Email
+                  </div>
+                  <Input
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="email@example.com"
+                    className="h-10 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
+                  />
+                </label>
+
+                <label className="block space-y-1">
+                  <div className="text-xs font-medium tracking-wide text-slate-300 uppercase">
+                    Số điện thoại
+                  </div>
+                  <Input
+                    name="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="+84 9xx xxx xxx"
+                    className="h-10 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
+                  />
+                </label>
+
+                <label className="block space-y-1">
+                  <div className="text-xs font-medium tracking-wide text-slate-300 uppercase">
+                    Tiểu sử
+                  </div>
+                  <textarea
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleInputChange}
+                    placeholder="Viết gì đó về bạn..."
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/70"
+                    rows={3}
+                  />
+                </label>
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-3">
+                  <Button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="flex-1 h-10 rounded-xl font-medium bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {loading ? "Đang lưu..." : "Lưu thay đổi"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setFormData({
+                        name: profile.name,
+                        email: profile.email || "",
+                        phone: profile.phone || "",
+                        bio: profile.bio || "",
+                      });
+                    }}
+                    className="flex-1 h-10 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                  >
+                    Hủy
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // View Mode
+              <div className="space-y-4 pt-1">
+                <div className="space-y-1">
+                  <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
+                    Tên
+                  </div>
+                  <div className="text-lg font-semibold text-slate-50">
+                    {profile.name}
+                  </div>
+                </div>
+
+                {profile.email && (
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
+                      Email
+                    </div>
+                    <div className="text-sm text-slate-200">
+                      {profile.email}
+                    </div>
+                  </div>
+                )}
+
+                {profile.phone && (
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
+                      Số điện thoại
+                    </div>
+                    <div className="text-sm text-slate-200">
+                      {profile.phone}
+                    </div>
+                  </div>
+                )}
+
+                {profile.bio && (
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
+                      Tiểu sử
+                    </div>
+                    <div className="text-sm text-slate-200 whitespace-pre-wrap">
+                      {profile.bio}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5">
+                    <div className="text-[11px] font-medium tracking-wide text-slate-200 uppercase">
+                      Mục tiêu
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-sky-200 capitalize">
+                      {profile.goal}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
+                    <div className="text-[11px] font-medium tracking-wide text-slate-200 uppercase">
+                      Chế độ ăn
+                    </div>
+                    <div className="mt-1 text-sm font-semibold text-emerald-200 capitalize">
+                      {profile.diet}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </>

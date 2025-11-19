@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import userRoutes from './routes/UserRoutes';
+import userRoutes from './routes/userRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { MessageConsumer } from './services/messageConsumer';
 import { UserController } from './controllers/UserController';

@@ -42,6 +42,23 @@ export class UserRepository {
     return result.rows[0] || null;
   }
 
+  // Create or upsert user (called when user registers)
+  static async createOrUpdate(userId: string, email: string, name?: string | null): Promise<UserResponse> {
+    const query = `
+      INSERT INTO users (user_id, email, name, is_active, created_at, updated_at)
+      VALUES ($1, $2, $3, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id) DO UPDATE SET
+        email = $2,
+        name = COALESCE($3, users.name),
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING user_id, name, email, gender, age, weight, height, fitness_goal, preferred_diet,
+                subscription_status, payment_method, created_at, updated_at, is_active,
+                last_login, email_verified, profile_picture_url
+    `;
+    const result = await this.pool.query(query, [userId, email, name || null]);
+    return result.rows[0];
+  }
+
   // Get user by ID
   static async findById(userId: string): Promise<UserResponse | null> {
     const query = `

@@ -72,6 +72,11 @@ export class UserService {
     return user;
   }
 
+  static async createUserWithEmail(userId: string, email: string): Promise<UserResponse> {
+    const name = email.split('@')[0] || 'User';
+    return await UserRepository.createOrUpdate(userId, email, name);
+  }
+
   // Update user profile
   static async updateUserProfile(userId: string, updateData: UpdateUserProfilePayload): Promise<UserResponse> {
     // Validate input data

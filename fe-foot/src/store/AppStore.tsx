@@ -81,16 +81,21 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         });
         if (response.ok) {
           const data = await response.json();
-          setAuthed(true); // <-- thay vì setAuthed(data.authed)
+          // Backend currently returns { valid, claims: { id, email, role } }
+          const claims = (data as any).user || (data as any).claims;
+          if (!claims) {
+            throw new Error('Missing auth claims');
+          }
+          setAuthed(true);
           setProfile({
-            name: data.user.emai,
+            name: claims.email,
             goal: 'maintain',
             diet: 'balanced',
             budgetPerMeal: 50000,
             timePerWorkout: 60,
-            username: data.user.email,
-            role: data.user.role,
-            needsOnboarding: data.user.role !== 'admin'
+            username: claims.email,
+            role: claims.role === 'admin' ? 'admin' : 'user',
+            needsOnboarding: claims.role !== 'admin'
           });
         } else {
           localStorage.removeItem('authToken');
@@ -219,15 +224,16 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           });
           if (profileResponse.ok) {
             const profileData = await profileResponse.json();
+            // API returns { success, user, needsOnboarding }
             setProfile({
-              name: profileData.profile?.full_name || username,
+              name: profileData.user?.name || username,
               goal: 'maintain',
               diet: 'balanced',
               budgetPerMeal: 50000,
               timePerWorkout: 60,
               username,
-              role: 'user',
-              needsOnboarding: profileData.onboarding === true
+              role: (profileData.user?.role || 'user').toString().toLowerCase() === 'admin' ? 'admin' : 'user',
+              needsOnboarding: profileData.needsOnboarding === true
             });
           } else {
             // Profile endpoint failed, set default with onboarding

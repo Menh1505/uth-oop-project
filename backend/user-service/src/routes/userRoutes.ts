@@ -11,7 +11,6 @@ router.get('/me', UserController.getMe);
 router.put('/me', UserController.updateMe);
 router.post('/me/avatar', UserController.uploadAvatar);
 
-// admin
 router.get('/admin/users', UserController.listUsers);
 
 export default router;

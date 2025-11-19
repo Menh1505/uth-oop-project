@@ -37,7 +37,7 @@ export default function AdminDashboard() {
       setStats(statsData);
       
       // Fetch users
-      const usersData = await ApiClient.get<User[]>("/users/admin/users");
+      const usersData = await ApiClient.get<User[]>("/admin/users");
       setUsers(usersData || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error loading data");
@@ -50,7 +50,7 @@ export default function AdminDashboard() {
     if (!confirm("Xóa user này?")) return;
 
     try {
-      await ApiClient.delete(`/users/${userId}`);
+      await ApiClient.delete(`/admin/users/${userId}`);
       setUsers(users.filter((u) => u.id !== userId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error deleting user");

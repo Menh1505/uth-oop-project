@@ -209,6 +209,26 @@ services:
     networks:
       - backend
 
+  admin-service:
+    build: ./admin-service
+    expose:
+      - "3003"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: uth
+      DB_NAME: fitfood_admin_db
+      NODE_ENV: development
+      PORT: 3003
+      JWT_SECRET: shared-secret
+      USER_SERVICE_URL: http://user-service:3002
+      AUTH_SERVICE_URL: http://auth-service:3001
+    depends_on:
+      - postgres
+    networks:
+      - backend
+
   # ==========================
   # Observability Stack
   # ==========================

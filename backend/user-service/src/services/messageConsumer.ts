@@ -70,14 +70,14 @@ export class MessageConsumer {
       switch (routingKey) {
         case 'user.registered': {
           const userId: string = event.userId;
-          const guessName = (event.email as string)?.split('@')[0] || null;
-          // Update user name if not set during registration
+          const email: string = event.email;
+          const guessName = email?.split('@')[0] || null;
+          // Create/update user in user_db
           try {
-            if (guessName) {
-              await UserRepository.updateProfile(userId, { name: guessName });
-            }
+            await UserRepository.createOrUpdate(userId, email, guessName);
+            logger.info({ userId, email }, 'User synced to user_db');
           } catch (error) {
-            logger.warn({ userId, error }, 'Could not update user name after registration');
+            logger.warn({ userId, email, error }, 'Could not sync user to user_db');
           }
           await LoginEventRepository.markProcessed(messageId, routingKey);
           break;
