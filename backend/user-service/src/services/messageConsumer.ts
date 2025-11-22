@@ -1,6 +1,6 @@
 import amqplib from 'amqplib';
-import logger from '../config/logger';
-import UserService from './UserService';
+import logger from '../config/logger.js';
+import UserService from './UserService.js';
 
 export class MessageConsumer {
   private static connection: any = null;

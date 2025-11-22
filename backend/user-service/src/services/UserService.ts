@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { v4 as generateUUID } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import {
   UserModel,
   AddressModel,
@@ -15,7 +15,7 @@ import {
   User,
   AssignGoalPayload,
   UpdateUserGoalPayload
-} from '../models/User';
+} from '../models/User.js';
 
 // Helper function để convert MongoDB document thành UserResponse
 const toUserResponse = (user: IUser): UserResponse => ({
@@ -54,7 +54,7 @@ export class UserService {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Generate unique user_id
-    const user_id = generateUUID();
+    const user_id = uuidv4();
 
     // Create new user
     const newUser = new UserModel({
@@ -234,7 +234,7 @@ export class UserService {
 
     // Create new user goal
     const userGoal = new UserGoalModel({
-      user_goal_id: generateUUID(),
+      user_goal_id: uuidv4(),
       user_id,
       goal_id: payload.goal_id,
       assigned_date: new Date(),

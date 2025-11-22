@@ -1,6 +1,6 @@
 import { Response } from 'express';
-import { AuthRequest } from '../middleware/authenticate';
-import { UserService } from '../services/UserService';
+import { AuthRequest } from '../middleware/authenticate.js';
+import { UserService } from '../services/UserService.js';
 
 export class UserController {
   // Health check

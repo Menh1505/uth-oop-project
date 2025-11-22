@@ -1,10 +1,10 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import connectDB from './config/database';
-import userRoutes from './routes/userRoutes';
-import { errorHandler } from './middleware/errorHandler';
-import { MessageConsumer } from './services/messageConsumer';
-import logger from './config/logger';
+import connectDB from './config/database.js';
+import userRoutes from './routes/userRoutes.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { MessageConsumer } from './services/messageConsumer.js';
+import logger from './config/logger.js';
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -72,7 +72,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.post('/register', async (req: Request, res: Response) => {
   try {
     const userData = req.body;
-    const { UserService } = await import('./services/UserService');
+    const { UserService } = await import('./services/UserService.js');
 
     const newUser = await UserService.registerUser(userData);
 
@@ -101,7 +101,7 @@ app.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    const { UserService } = await import('./services/UserService');
+    const { UserService } = await import('./services/UserService.js');
     const user = await UserService.loginUser({ email, password });
     const needsOnboarding = await UserService.needsOnboarding(user.user_id);
 

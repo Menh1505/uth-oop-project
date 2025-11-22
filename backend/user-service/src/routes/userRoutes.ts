@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { UserController } from '../controllers/UserController';
-import { authenticate } from '../middleware/authenticate';
+import { UserController } from '../controllers/UserController.js';
+import { authenticate } from '../middleware/authenticate.js';
 
 const router = Router();
 const upload = multer({
