@@ -1,13 +1,26 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "./ui/Button";
 import { Input } from "./ui/Input";
 import type { UserProfile } from "../types";
+import { ApiClient } from "../lib/api/client";
+
+// Mở rộng thêm các field backend trả về
+type CombinedProfile = UserProfile & {
+  gender?: string | null;
+  age?: number | null;
+  weight?: string | null;
+  height?: string | null;
+  fitness_goal?: string | null;
+  preferred_diet?: string | null;
+  subscription_status?: string | null;
+  profile_picture_url?: string | null;
+};
 
 interface ProfileModalProps {
-  profile: UserProfile | null;
+  profile: CombinedProfile | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: (profile: Partial<UserProfile>) => Promise<void>;
+  onUpdate: (profile: Partial<CombinedProfile>) => Promise<void>;
 }
 
 export default function ProfileModal({
@@ -17,16 +30,88 @@ export default function ProfileModal({
   onUpdate,
 }: ProfileModalProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Dữ liệu lấy trực tiếp từ /users/me
+  const [serverProfile, setServerProfile] = useState<CombinedProfile | null>(
+    null
+  );
+
   const [formData, setFormData] = useState({
     name: profile?.name || "",
     email: profile?.email || "",
-    phone: profile?.phone || "",
-    bio: profile?.bio || "",
+    phone: (profile as any)?.phone || "",
+    bio: (profile as any)?.bio || "",
   });
 
-  if (!isOpen || !profile) return null;
+  // Khi prop profile đổi, sync lại form
+  useEffect(() => {
+    setFormData({
+      name: profile?.name || "",
+      email: profile?.email || "",
+      phone: (profile as any)?.phone || "",
+      bio: (profile as any)?.bio || "",
+    });
+  }, [profile]);
+
+  // Mỗi lần mở modal → lấy dữ liệu mới nhất từ backend
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+
+    const hydrateFromApi = async () => {
+      setFetching(true);
+      setError(null);
+      try {
+        const data = await ApiClient.get<{ user: any }>("/users/me");
+        const user = data?.user || data;
+        if (!user || !active) return;
+
+        const hydrated: CombinedProfile = {
+          ...(profile || ({} as CombinedProfile)),
+          user_id: user.user_id,
+          name: user.name,
+          email: user.email,
+          gender: user.gender,
+          age: user.age,
+          weight: user.weight,
+          height: user.height,
+          fitness_goal: user.fitness_goal,
+          preferred_diet: user.preferred_diet,
+          subscription_status: user.subscription_status,
+          profile_picture_url: user.profile_picture_url,
+        };
+
+        setServerProfile(hydrated);
+
+        setFormData({
+          name: user.name || profile?.name || "",
+          email: user.email || profile?.email || "",
+          phone: (profile as any)?.phone || "",
+          bio: (profile as any)?.bio || "",
+        });
+      } catch (err) {
+        console.error("ProfileModal hydrate failed:", err);
+        if (active) {
+          setError("Không thể tải hồ sơ từ server");
+        }
+      } finally {
+        if (active) setFetching(false);
+      }
+    };
+
+    hydrateFromApi();
+    return () => {
+      active = false;
+    };
+  }, [isOpen, profile]);
+
+  if (!isOpen) return null;
+  // Ưu tiên dữ liệu từ server, fallback về profile prop
+  const displayProfile = (serverProfile || profile) as CombinedProfile | null;
+  if (!displayProfile) return null;
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -36,26 +121,49 @@ export default function ProfileModal({
   };
 
   const handleSave = async () => {
-    setLoading(true);
+    setSaving(true);
     setError(null);
     try {
       await onUpdate({
         name: formData.name,
         email: formData.email,
-        phone: formData.phone,
-        bio: formData.bio,
+        // tuỳ backend có support phone/bio hay không
+        phone: formData.phone as any,
+        bio: formData.bio as any,
       });
+
       setIsEditing(false);
+      setServerProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: formData.name,
+              email: formData.email,
+              phone: formData.phone as any,
+              bio: formData.bio as any,
+            }
+          : prev
+      );
     } catch (err: any) {
       setError(err.message || "Cập nhật thất bại");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  const avatarUrl =
+    displayProfile.profile_picture_url ||
+    (displayProfile as any).avatar ||
+    null;
+
+  const goalText =
+    displayProfile.fitness_goal ||
+    (displayProfile as any).goal ||
+    "Chưa đặt mục tiêu";
+
   return (
     <>
-      {/* Modal Backdrop */}
+      {/* Backdrop */}
       <div
         className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm"
         onClick={onClose}
@@ -91,15 +199,15 @@ export default function ProfileModal({
               </div>
             )}
 
-            {/* Avatar Section */}
+            {/* Avatar */}
             <div className="flex flex-col items-center gap-3 pb-4 border-b border-slate-800/70">
               <div className="relative">
                 <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-400 via-sky-500 to-indigo-500 p-[3px] shadow-lg shadow-emerald-500/30">
                   <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
-                    {profile.avatar ? (
+                    {avatarUrl ? (
                       <img
-                        src={profile.avatar}
-                        alt={profile.name}
+                        src={avatarUrl}
+                        alt={displayProfile.name}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -117,15 +225,16 @@ export default function ProfileModal({
                   type="button"
                   onClick={() => setIsEditing(true)}
                   className="mt-4 h-9 rounded-xl px-4 text-sm font-medium bg-sky-500 hover:bg-sky-400 shadow-sm"
+                  disabled={fetching}
                 >
-                  Chỉnh sửa hồ sơ
+                  {fetching ? "Đang tải..." : "Chỉnh sửa hồ sơ"}
                 </Button>
               )}
             </div>
 
-            {/* Profile Info */}
+            {/* Info */}
             {isEditing ? (
-              // Edit Mode
+              // EDIT MODE
               <div className="space-y-3 pt-1">
                 <label className="block space-y-1">
                   <div className="text-xs font-medium tracking-wide text-slate-300 uppercase">
@@ -186,10 +295,10 @@ export default function ProfileModal({
                   <Button
                     type="button"
                     onClick={handleSave}
-                    disabled={loading}
+                    disabled={saving}
                     className="flex-1 h-10 rounded-xl font-medium bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {loading ? "Đang lưu..." : "Lưu thay đổi"}
+                    {saving ? "Đang lưu..." : "Lưu thay đổi"}
                   </Button>
                   <Button
                     type="button"
@@ -197,10 +306,10 @@ export default function ProfileModal({
                     onClick={() => {
                       setIsEditing(false);
                       setFormData({
-                        name: profile.name,
-                        email: profile.email || "",
-                        phone: profile.phone || "",
-                        bio: profile.bio || "",
+                        name: profile?.name || "",
+                        email: profile?.email || "",
+                        phone: (profile as any)?.phone || "",
+                        bio: (profile as any)?.bio || "",
                       });
                     }}
                     className="flex-1 h-10 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
@@ -210,46 +319,83 @@ export default function ProfileModal({
                 </div>
               </div>
             ) : (
-              // View Mode
+              // VIEW MODE
               <div className="space-y-4 pt-1">
                 <div className="space-y-1">
                   <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
                     Tên
                   </div>
                   <div className="text-lg font-semibold text-slate-50">
-                    {profile.name}
+                    {displayProfile.name}
                   </div>
                 </div>
 
-                {profile.email && (
+                {displayProfile.email && (
                   <div className="space-y-1">
                     <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
                       Email
                     </div>
                     <div className="text-sm text-slate-200">
-                      {profile.email}
+                      {displayProfile.email}
                     </div>
                   </div>
                 )}
 
-                {profile.phone && (
+                {displayProfile.gender && (
                   <div className="space-y-1">
                     <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-                      Số điện thoại
+                      Giới tính
                     </div>
                     <div className="text-sm text-slate-200">
-                      {profile.phone}
+                      {displayProfile.gender}
                     </div>
                   </div>
                 )}
 
-                {profile.bio && (
+                {(displayProfile.age ||
+                  displayProfile.height ||
+                  displayProfile.weight) && (
+                  <div className="grid grid-cols-3 gap-3">
+                    {displayProfile.age && (
+                      <div className="space-y-0.5">
+                        <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                          Tuổi
+                        </div>
+                        <div className="text-sm text-slate-200">
+                          {displayProfile.age}
+                        </div>
+                      </div>
+                    )}
+                    {displayProfile.height && (
+                      <div className="space-y-0.5">
+                        <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                          Chiều cao
+                        </div>
+                        <div className="text-sm text-slate-200">
+                          {displayProfile.height} cm
+                        </div>
+                      </div>
+                    )}
+                    {displayProfile.weight && (
+                      <div className="space-y-0.5">
+                        <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                          Cân nặng
+                        </div>
+                        <div className="text-sm text-slate-200">
+                          {displayProfile.weight} kg
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(displayProfile as any).bio && (
                   <div className="space-y-1">
                     <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
                       Tiểu sử
                     </div>
                     <div className="text-sm text-slate-200 whitespace-pre-wrap">
-                      {profile.bio}
+                      {(displayProfile as any).bio}
                     </div>
                   </div>
                 )}
@@ -260,7 +406,7 @@ export default function ProfileModal({
                       Mục tiêu
                     </div>
                     <div className="mt-1 text-sm font-semibold text-sky-200 capitalize">
-                      {profile.goal}
+                      {goalText}
                     </div>
                   </div>
                 </div>
