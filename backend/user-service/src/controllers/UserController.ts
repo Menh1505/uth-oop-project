@@ -351,7 +351,6 @@ export class UserController {
     }
   }
 
-  // Upload avatar
   static async uploadAvatar(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
@@ -362,16 +361,14 @@ export class UserController {
         });
       }
 
-      // Get base64 avatar from request body
       let avatarBase64: string | null = null;
 
-      if ((req as any).body && typeof (req as any).body === 'string') {
-        avatarBase64 = (req as any).body;
-      }
-
-      const avatarField = (req as any).body?.avatar || (req as any).body?.profile_picture_url;
-      if (avatarField) {
-        avatarBase64 = avatarField;
+      if (req.file && req.file.buffer) {
+        const mime = req.file.mimetype || 'image/png';
+        avatarBase64 = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+      } else if (req.body) {
+        const body: any = req.body;
+        avatarBase64 = body.avatar || body.profile_picture_url || null;
       }
 
       if (!avatarBase64) {
@@ -381,7 +378,6 @@ export class UserController {
         });
       }
 
-      // Basic validation
       if (typeof avatarBase64 !== 'string' || !avatarBase64.startsWith('data:image/')) {
         return res.status(400).json({ 
           success: false,
@@ -393,20 +389,21 @@ export class UserController {
         profile_picture_url: avatarBase64
       });
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Avatar uploaded successfully',
         user: updatedUser
       });
     } catch (error: any) {
       console.error('Avatar upload error:', error);
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to upload avatar',
         error: error.message || 'Unknown error'
       });
     }
   }
+
 
   // Admin: List users
   static async listUsers(req: AuthRequest, res: Response) {
