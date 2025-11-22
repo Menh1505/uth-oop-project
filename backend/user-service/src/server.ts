@@ -1,5 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import connectDB from './config/database';
 import userRoutes from './routes/userRoutes';
 import { errorHandler } from './middleware/errorHandler';
 import { MessageConsumer } from './services/messageConsumer';
@@ -8,6 +9,9 @@ import logger from './config/logger';
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+// Connect to MongoDB
+connectDB();
+
 // ===== Health check endpoints =====
 
 // Health check cực nhẹ cho k8s / docker / gateway
@@ -15,9 +19,9 @@ app.get('/health', (req: Request, res: Response) => {
   const healthData = {
     status: 'OK',
     service: 'user-service',
+    database: 'MongoDB',
     timestamp: new Date().toISOString(),
-    version: '2.0.0',
-    database: 'connected', // sau này có thể thay bằng check thực
+    version: '2.0.0'
   };
   res.json(healthData);
 });
@@ -28,7 +32,7 @@ app.get('/status', (req: Request, res: Response) => {
     service: 'user-service',
     status: 'healthy',
     version: '2.0.0',
-    database: process.env.DB_NAME || 'user_db',
+    database: 'MongoDB',
     timestamp: new Date().toISOString(),
     endpoints: [
       'POST /register',
@@ -128,16 +132,13 @@ app.use(errorHandler);
 
 async function startServer() {
   try {
-    // Log config DB để debug
+    // Log MongoDB connection info
     logger.info(
       {
-        user: process.env.DB_USER || 'postgres',
-        host: process.env.DB_HOST || 'localhost',
-        database: process.env.DB_NAME || 'user_db',
-        password_set: !!process.env.DB_PASSWORD,
-        port: process.env.DB_PORT || '5432',
+        mongodb_uri: process.env.MONGODB_URI ? '[SET]' : '[DEFAULT]',
+        database: 'fitfood_user_db'
       },
-      'Database connection config',
+      'MongoDB connection config',
     );
 
     const server = app.listen(PORT, () => {

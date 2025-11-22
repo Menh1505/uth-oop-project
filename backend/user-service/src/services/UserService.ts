@@ -1,248 +1,492 @@
-import { UserRepository } from '../repositories/UserRepository';
-import { GoalRepository } from '../repositories/GoalRepository';
-import { 
-  RegisterUserPayload, 
-  LoginUserPayload, 
-  UserResponse, 
+import bcrypt from 'bcrypt';
+import { v4 as generateUUID } from 'uuid';
+import {
+  UserModel,
+  AddressModel,
+  PreferencesModel,
+  GoalModel,
+  UserGoalModel,
+  IUser,
+  RegisterUserPayload,
+  LoginUserPayload,
   UpdateUserProfilePayload,
   OnboardingPayload,
+  UserResponse,
+  User,
   AssignGoalPayload,
   UpdateUserGoalPayload
 } from '../models/User';
 
+// Helper function để convert MongoDB document thành UserResponse
+const toUserResponse = (user: IUser): UserResponse => ({
+  user_id: user.user_id,
+  name: user.name,
+  email: user.email,
+  gender: user.gender,
+  age: user.age,
+  weight: user.weight,
+  height: user.height,
+  fitness_goal: user.fitness_goal,
+  preferred_diet: user.preferred_diet,
+  subscription_status: user.subscription_status,
+  payment_method: user.payment_method,
+  created_at: user.created_at.toISOString(),
+  updated_at: user.updated_at.toISOString(),
+  is_active: user.is_active,
+  last_login: user.last_login?.toISOString() || null,
+  email_verified: user.email_verified,
+  profile_picture_url: user.profile_picture_url
+});
+
 export class UserService {
-  // Register new user
-  static async registerUser(userData: RegisterUserPayload): Promise<UserResponse> {
-    // Check if email already exists
-    const emailExists = await UserRepository.emailExists(userData.email);
-    if (emailExists) {
-      throw new Error('Email already exists');
+  // ===== User Registration & Login =====
+  
+  static async registerUser(payload: RegisterUserPayload): Promise<UserResponse> {
+    const { email, password, name, ...otherData } = payload;
+
+    // Check if user already exists
+    const existingUser = await UserModel.findOne({ email }).lean();
+    if (existingUser) {
+      throw new Error('User already exists with this email');
     }
 
-    // Validate required fields
-    if (!userData.name || userData.name.trim().length === 0) {
-      throw new Error('Name is required');
-    }
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    if (!userData.email || !this.isValidEmail(userData.email)) {
-      throw new Error('Valid email is required');
-    }
+    // Generate unique user_id
+    const user_id = generateUUID();
 
-    if (!userData.password || userData.password.length < 6) {
-      throw new Error('Password must be at least 6 characters long');
-    }
+    // Create new user
+    const newUser = new UserModel({
+      user_id,
+      name,
+      email,
+      password: hashedPassword,
+      subscription_status: 'Basic',
+      is_active: true,
+      email_verified: false,
+      ...otherData
+    });
 
-    // Validate optional numeric fields
-    if (userData.age !== undefined && (userData.age <= 0 || userData.age >= 150)) {
-      throw new Error('Age must be between 1 and 149');
-    }
-
-    if (userData.weight !== undefined && userData.weight <= 0) {
-      throw new Error('Weight must be greater than 0');
-    }
-
-    if (userData.height !== undefined && userData.height <= 0) {
-      throw new Error('Height must be greater than 0');
-    }
-
-    return await UserRepository.create(userData);
+    const savedUser = await newUser.save();
+    return toUserResponse(savedUser);
   }
 
-  // User login
-  static async loginUser(loginData: LoginUserPayload): Promise<UserResponse> {
-    const user = await UserRepository.validatePassword(loginData.email, loginData.password);
+  static async loginUser(payload: LoginUserPayload): Promise<UserResponse> {
+    const { email, password } = payload;
+
+    const user = await UserModel.findOne({ email, is_active: true });
     if (!user) {
-      throw new Error('Invalid email or password');
+      throw new Error('Invalid credentials');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new Error('Invalid credentials');
     }
 
     // Update last login
-    await UserRepository.updateLastLogin(user.user_id);
+    user.last_login = new Date();
+    await user.save();
 
-    // Return user without password
-    const { password, ...userResponse } = user;
-    return userResponse as UserResponse;
+    return toUserResponse(user);
   }
 
-  // Get user profile
-  static async getUserProfile(userId: string): Promise<UserResponse> {
-    const user = await UserRepository.findById(userId);
+  // ===== User Profile Management =====
+
+  static async getUserProfile(user_id: string): Promise<UserResponse> {
+    const user = await UserModel.findOne({ user_id, is_active: true });
     if (!user) {
       throw new Error('User not found');
     }
-    return user;
+
+    return toUserResponse(user);
   }
 
-  static async createUserWithEmail(userId: string, email: string): Promise<UserResponse> {
-    const name = email.split('@')[0] || 'User';
-    return await UserRepository.createOrUpdate(userId, email, name);
-  }
-
-  // Update user profile
-  static async updateUserProfile(userId: string, updateData: UpdateUserProfilePayload): Promise<UserResponse> {
-    // Validate input data
-    if (updateData.age !== undefined && (updateData.age <= 0 || updateData.age >= 150)) {
-      throw new Error('Age must be between 1 and 149');
-    }
-
-    if (updateData.weight !== undefined && updateData.weight <= 0) {
-      throw new Error('Weight must be greater than 0');
-    }
-
-    if (updateData.height !== undefined && updateData.height <= 0) {
-      throw new Error('Height must be greater than 0');
-    }
-
-    if (updateData.name !== undefined && updateData.name.trim().length === 0) {
-      throw new Error('Name cannot be empty');
-    }
-
-    return await UserRepository.updateProfile(userId, updateData);
-  }
-
-  // Complete onboarding (update profile with health info)
-  static async completeOnboarding(userId: string, onboardingData: OnboardingPayload): Promise<UserResponse> {
-    return await this.updateUserProfile(userId, onboardingData);
-  }
-
-  // Check if user needs onboarding
-  static async needsOnboarding(userId: string): Promise<boolean> {
-    const user = await UserRepository.findById(userId);
-    if (!user) {
-      return true;
-    }
-
-    // User needs onboarding nếu CHƯA có thông tin sức khỏe cơ bản
-    // Trước đây còn check cả fitness_goal nên dù đã có name/gender/age/weight/height
-    // vẫn bị coi là chưa onboarding. Ở đây chỉ yêu cầu 4 field chính:
-    // - gender
-    // - age
-    // - weight
-    // - height
-    // fitness_goal trở thành optional, có thể set sau.
-    return (
-      !user.gender ||
-      user.age == null ||
-      user.weight == null ||
-      user.height == null
+  static async updateUserProfile(user_id: string, payload: UpdateUserProfilePayload): Promise<UserResponse> {
+    const user = await UserModel.findOneAndUpdate(
+      { user_id, is_active: true },
+      { $set: payload },
+      { new: true, runValidators: true }
     );
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return toUserResponse(user);
   }
 
-  // Get available goals
+  static async createUserWithEmail(user_id: string, email: string): Promise<UserResponse> {
+    // Check if user already exists
+    const existingUser = await UserModel.findOne({ $or: [{ user_id }, { email }] });
+    if (existingUser) {
+      if (existingUser.user_id === user_id) {
+        return toUserResponse(existingUser);
+      }
+      throw new Error('User already exists with this email');
+    }
+
+    // Create minimal user (for auth-service created users)
+    const newUser = new UserModel({
+      user_id,
+      name: email.split('@')[0], // Use email prefix as default name
+      email,
+      password: await bcrypt.hash(Math.random().toString(), 10), // Random password (will be managed by auth-service)
+      subscription_status: 'Basic',
+      is_active: true,
+      email_verified: false
+    });
+
+    const savedUser = await newUser.save();
+    return toUserResponse(savedUser);
+  }
+
+  // ===== Onboarding =====
+
+  static async needsOnboarding(user_id: string): Promise<boolean> {
+    const user = await UserModel.findOne({ user_id, is_active: true }).lean();
+    if (!user) {
+      return true; // If user doesn't exist, they need onboarding
+    }
+
+    // User needs onboarding if missing key profile data
+    return !user.age || !user.gender || !user.height || !user.weight || !user.fitness_goal;
+  }
+
+  static async completeOnboarding(user_id: string, payload: OnboardingPayload): Promise<UserResponse> {
+    const user = await UserModel.findOneAndUpdate(
+      { user_id, is_active: true },
+      { $set: payload },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return toUserResponse(user);
+  }
+
+  // ===== Goals Management =====
+
   static async getAvailableGoals() {
-    return await GoalRepository.getAllGoals();
+    const goals = await GoalModel.find({ is_active: true }).lean();
+    return goals.map(goal => ({
+      goal_id: goal.goal_id,
+      goal_type: goal.goal_type,
+      description: goal.description,
+      target_calories: goal.target_calories,
+      target_protein: goal.target_protein,
+      target_carbs: goal.target_carbs,
+      target_fat: goal.target_fat,
+      target_weight: goal.target_weight,
+      target_duration_weeks: goal.target_duration_weeks,
+      is_active: goal.is_active,
+      created_at: goal.created_at.toISOString(),
+      updated_at: goal.updated_at.toISOString()
+    }));
   }
 
-  // Get user's goals
-  static async getUserGoals(userId: string) {
-    return await GoalRepository.getUserGoals(userId);
+  static async getUserGoals(user_id: string) {
+    const userGoals = await UserGoalModel.find({ user_id })
+      .populate('goal_id')
+      .lean();
+
+    return userGoals.map(userGoal => ({
+      user_goal_id: userGoal.user_goal_id,
+      user_id: userGoal.user_id,
+      goal_id: userGoal.goal_id,
+      assigned_date: userGoal.assigned_date.toISOString(),
+      target_completion_date: userGoal.target_completion_date?.toISOString() || null,
+      actual_completion_date: userGoal.actual_completion_date?.toISOString() || null,
+      progress_percentage: userGoal.progress_percentage,
+      status: userGoal.status,
+      notes: userGoal.notes,
+      created_at: userGoal.created_at.toISOString(),
+      updated_at: userGoal.updated_at.toISOString()
+    }));
   }
 
-  // Get user's active goals
-  static async getUserActiveGoals(userId: string) {
-    return await GoalRepository.getActiveUserGoals(userId);
-  }
+  static async assignGoalToUser(user_id: string, payload: AssignGoalPayload) {
+    // Check if user exists
+    const user = await UserModel.findOne({ user_id, is_active: true }).lean();
+    if (!user) {
+      throw new Error('User not found');
+    }
 
-  // Assign goal to user
-  static async assignGoalToUser(userId: string, assignData: AssignGoalPayload) {
     // Check if goal exists
-    const goal = await GoalRepository.getGoalById(assignData.goal_id);
+    const goal = await GoalModel.findOne({ goal_id: payload.goal_id, is_active: true }).lean();
     if (!goal) {
       throw new Error('Goal not found');
     }
 
-    // Check if user already has an active goal of the same type
-    const hasActiveGoal = await GoalRepository.hasActiveGoalOfType(userId, goal.goal_type);
-    if (hasActiveGoal) {
-      throw new Error(`You already have an active ${goal.goal_type} goal`);
+    // Check if user already has this goal assigned
+    const existingUserGoal = await UserGoalModel.findOne({ 
+      user_id, 
+      goal_id: payload.goal_id,
+      status: { $in: ['Active', 'Paused'] }
+    }).lean();
+    
+    if (existingUserGoal) {
+      throw new Error('User already has this goal assigned');
     }
 
-    // Validate target completion date if provided
-    if (assignData.target_completion_date) {
-      const targetDate = new Date(assignData.target_completion_date);
-      const now = new Date();
-      if (targetDate <= now) {
-        throw new Error('Target completion date must be in the future');
-      }
-    }
+    // Create new user goal
+    const userGoal = new UserGoalModel({
+      user_goal_id: generateUUID(),
+      user_id,
+      goal_id: payload.goal_id,
+      assigned_date: new Date(),
+      target_completion_date: payload.target_completion_date ? new Date(payload.target_completion_date) : null,
+      notes: payload.notes,
+      progress_percentage: 0,
+      status: 'Active'
+    });
 
-    return await GoalRepository.assignGoalToUser(userId, assignData);
-  }
-
-  // Update user goal progress
-  static async updateUserGoalProgress(userId: string, userGoalId: string, updateData: UpdateUserGoalPayload) {
-    // Check if the goal belongs to the user
-    const userGoal = await GoalRepository.getUserGoalById(userGoalId);
-    if (!userGoal || userGoal.user_id !== userId) {
-      throw new Error('Goal not found or does not belong to user');
-    }
-
-    // Validate progress percentage
-    if (updateData.progress_percentage !== undefined) {
-      if (updateData.progress_percentage < 0 || updateData.progress_percentage > 100) {
-        throw new Error('Progress percentage must be between 0 and 100');
-      }
-    }
-
-    // Validate target completion date if provided
-    if (updateData.target_completion_date) {
-      const targetDate = new Date(updateData.target_completion_date);
-      const now = new Date();
-      if (targetDate <= now) {
-        throw new Error('Target completion date must be in the future');
-      }
-    }
-
-    return await GoalRepository.updateUserGoal(userGoalId, updateData);
-  }
-
-  // Remove user goal
-  static async removeUserGoal(userId: string, userGoalId: string) {
-    // Check if the goal belongs to the user
-    const userGoal = await GoalRepository.getUserGoalById(userGoalId);
-    if (!userGoal || userGoal.user_id !== userId) {
-      throw new Error('Goal not found or does not belong to user');
-    }
-
-    return await GoalRepository.removeUserGoal(userGoalId);
-  }
-
-  // Get user dashboard data
-  static async getUserDashboard(userId: string) {
-    const user = await this.getUserProfile(userId);
-    const activeGoals = await this.getUserActiveGoals(userId);
-    const needsOnboarding = await this.needsOnboarding(userId);
-
+    const savedUserGoal = await userGoal.save();
+    
     return {
-      user,
-      activeGoals,
-      needsOnboarding,
-      totalActiveGoals: activeGoals.length
+      user_goal_id: savedUserGoal.user_goal_id,
+      user_id: savedUserGoal.user_id,
+      goal_id: savedUserGoal.goal_id,
+      assigned_date: savedUserGoal.assigned_date.toISOString(),
+      target_completion_date: savedUserGoal.target_completion_date?.toISOString() || null,
+      actual_completion_date: savedUserGoal.actual_completion_date?.toISOString() || null,
+      progress_percentage: savedUserGoal.progress_percentage,
+      status: savedUserGoal.status,
+      notes: savedUserGoal.notes,
+      created_at: savedUserGoal.created_at.toISOString(),
+      updated_at: savedUserGoal.updated_at.toISOString()
     };
   }
 
-  // Admin: List all users
-  static async listAllUsers(limit = 50, offset = 0) {
-    return await UserRepository.listUsers(limit, offset);
+  static async updateUserGoal(user_goal_id: string, payload: UpdateUserGoalPayload) {
+    const userGoal = await UserGoalModel.findOneAndUpdate(
+      { user_goal_id },
+      { 
+        $set: {
+          ...payload,
+          target_completion_date: payload.target_completion_date ? new Date(payload.target_completion_date) : undefined,
+          actual_completion_date: payload.status === 'Completed' ? new Date() : undefined
+        }
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!userGoal) {
+      throw new Error('User goal not found');
+    }
+
+    return {
+      user_goal_id: userGoal.user_goal_id,
+      user_id: userGoal.user_id,
+      goal_id: userGoal.goal_id,
+      assigned_date: userGoal.assigned_date.toISOString(),
+      target_completion_date: userGoal.target_completion_date?.toISOString() || null,
+      actual_completion_date: userGoal.actual_completion_date?.toISOString() || null,
+      progress_percentage: userGoal.progress_percentage,
+      status: userGoal.status,
+      notes: userGoal.notes,
+      created_at: userGoal.created_at.toISOString(),
+      updated_at: userGoal.updated_at.toISOString()
+    };
   }
 
-  // Update subscription status
-  static async updateSubscription(userId: string, status: 'Basic' | 'Premium') {
-    return await UserRepository.updateSubscription(userId, status);
+  // ===== Admin Functions =====
+
+  static async getAllUsers(page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    
+    const [users, total] = await Promise.all([
+      UserModel.find({ is_active: true })
+        .select('-password')
+        .skip(skip)
+        .limit(limit)
+        .sort({ created_at: -1 })
+        .lean(),
+      UserModel.countDocuments({ is_active: true })
+    ]);
+
+    return {
+      users: users.map(user => ({
+        user_id: user.user_id,
+        name: user.name,
+        email: user.email,
+        subscription_status: user.subscription_status,
+        created_at: user.created_at.toISOString(),
+        last_login: user.last_login?.toISOString() || null,
+        email_verified: user.email_verified
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
   }
 
-  // Deactivate user account
-  static async deactivateUser(userId: string) {
-    return await UserRepository.deactivate(userId);
+  static async listAllUsers(limit = 10, offset = 0) {
+    const [users, total] = await Promise.all([
+      UserModel.find({ is_active: true })
+        .select('-password')
+        .skip(offset)
+        .limit(limit)
+        .sort({ created_at: -1 })
+        .lean(),
+      UserModel.countDocuments({ is_active: true })
+    ]);
+
+    return {
+      users: users.map(user => ({
+        user_id: user.user_id,
+        name: user.name,
+        email: user.email,
+        subscription_status: user.subscription_status,
+        created_at: user.created_at.toISOString(),
+        last_login: user.last_login?.toISOString() || null,
+        email_verified: user.email_verified
+      })),
+      total
+    };
   }
 
-  // Verify email
-  static async verifyEmail(userId: string) {
-    return await UserRepository.verifyEmail(userId);
+  static async getUserActiveGoals(user_id: string) {
+    const activeUserGoals = await UserGoalModel.find({ 
+      user_id, 
+      status: { $in: ['Active', 'Paused'] }
+    }).lean();
+
+    return activeUserGoals.map(userGoal => ({
+      user_goal_id: userGoal.user_goal_id,
+      user_id: userGoal.user_id,
+      goal_id: userGoal.goal_id,
+      assigned_date: userGoal.assigned_date.toISOString(),
+      target_completion_date: userGoal.target_completion_date?.toISOString() || null,
+      actual_completion_date: userGoal.actual_completion_date?.toISOString() || null,
+      progress_percentage: userGoal.progress_percentage,
+      status: userGoal.status,
+      notes: userGoal.notes,
+      created_at: userGoal.created_at.toISOString(),
+      updated_at: userGoal.updated_at.toISOString()
+    }));
   }
 
-  // Helper method to validate email format
-  private static isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  static async updateUserGoalProgress(user_id: string, user_goal_id: string, payload: UpdateUserGoalPayload) {
+    const userGoal = await UserGoalModel.findOneAndUpdate(
+      { user_goal_id, user_id },
+      { 
+        $set: {
+          ...payload,
+          target_completion_date: payload.target_completion_date ? new Date(payload.target_completion_date) : undefined,
+          actual_completion_date: payload.status === 'Completed' ? new Date() : undefined
+        }
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!userGoal) {
+      throw new Error('User goal not found');
+    }
+
+    return {
+      user_goal_id: userGoal.user_goal_id,
+      user_id: userGoal.user_id,
+      goal_id: userGoal.goal_id,
+      assigned_date: userGoal.assigned_date.toISOString(),
+      target_completion_date: userGoal.target_completion_date?.toISOString() || null,
+      actual_completion_date: userGoal.actual_completion_date?.toISOString() || null,
+      progress_percentage: userGoal.progress_percentage,
+      status: userGoal.status,
+      notes: userGoal.notes,
+      created_at: userGoal.created_at.toISOString(),
+      updated_at: userGoal.updated_at.toISOString()
+    };
+  }
+
+  static async removeUserGoal(user_id: string, user_goal_id: string) {
+    const userGoal = await UserGoalModel.findOneAndUpdate(
+      { user_goal_id, user_id },
+      { status: 'Cancelled' },
+      { new: true }
+    );
+
+    if (!userGoal) {
+      throw new Error('User goal not found');
+    }
+
+    return { message: 'User goal removed successfully' };
+  }
+
+  static async getUserDashboard(user_id: string) {
+    const [user, activeGoals, totalGoals] = await Promise.all([
+      UserModel.findOne({ user_id, is_active: true }).select('-password').lean(),
+      UserGoalModel.countDocuments({ user_id, status: { $in: ['Active', 'Paused'] } }),
+      UserGoalModel.countDocuments({ user_id })
+    ]);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const completedGoals = await UserGoalModel.countDocuments({ 
+      user_id, 
+      status: 'Completed' 
+    });
+
+    return {
+      user: toUserResponse(user as any),
+      stats: {
+        activeGoals,
+        completedGoals,
+        totalGoals,
+        completionRate: totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0
+      },
+      needsOnboarding: !user.age || !user.gender || !user.height || !user.weight || !user.fitness_goal
+    };
+  }
+
+  static async deactivateUser(user_id: string) {
+    const user = await UserModel.findOneAndUpdate(
+      { user_id },
+      { is_active: false },
+      { new: true }
+    );
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return { message: 'User deactivated successfully' };
+  }
+
+  // ===== Utility Functions =====
+
+  static async validatePassword(email: string, password: string): Promise<boolean> {
+    const user = await UserModel.findOne({ email, is_active: true }).lean();
+    if (!user) {
+      return false;
+    }
+
+    return await bcrypt.compare(password, user.password);
+  }
+
+  static async updatePassword(user_id: string, newPassword: string): Promise<void> {
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    const user = await UserModel.findOneAndUpdate(
+      { user_id, is_active: true },
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    if (!user) {
+      throw new Error('User not found');
+    }
   }
 }
+
+
+
+export default UserService;

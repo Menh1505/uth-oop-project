@@ -425,7 +425,7 @@ export class UserController {
         users,
         limit,
         offset,
-        total: users.length
+        total: users.total
       });
     } catch (error: any) {
       console.error('List users error:', error);

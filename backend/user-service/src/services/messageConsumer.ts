@@ -1,133 +1,151 @@
-import { connect, Channel, Connection, ConsumeMessage } from 'amqplib';
-import crypto from 'node:crypto';
-import { rabbitMQConfig } from '../config/rabbitmq';
+import amqplib from 'amqplib';
 import logger from '../config/logger';
-import { LoginEventRepository } from '../repositories/LoginEventRepository';
-import { UserRepository } from '../repositories/UserRepository';
-
-const MAX_RETRIES = 5;
-const RETRY_DELAY_MS = 5000;
+import UserService from './UserService';
 
 export class MessageConsumer {
-  private static connection: Connection | null = null;
-  private static channel: Channel | null = null;
-  private static retryCount = 0;
-  private static retryTimer: NodeJS.Timeout | null = null;
+  private static connection: any = null;
+  private static channel: any = null;
+  private static isConnected = false;
 
   static async start(): Promise<void> {
     try {
-      logger.info({ url: rabbitMQConfig.url }, 'User-service: connecting RabbitMQ...');
-      const conn = await connect(rabbitMQConfig.url);
-      this.connection = conn as any;
-
-      conn.on('error', (err) => {
-        logger.error({ err }, 'RabbitMQ connection error');
-        this.scheduleRetry();
+      const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://admin:admin@localhost:5672';
+      
+      // Connect to RabbitMQ
+      this.connection = await amqplib.connect(RABBITMQ_URL);
+      this.channel = await this.connection.createChannel();
+      
+      // Ensure exchange and queues exist
+      await this.channel.assertExchange('user_events', 'topic', { durable: true });
+      await this.channel.assertQueue('user_service_queue', { durable: true });
+      
+      // Bind queue to exchange
+      await this.channel.bindQueue('user_service_queue', 'user_events', 'user.*');
+      
+      // Set up message consumer
+      await this.channel.consume('user_service_queue', this.handleMessage.bind(this), {
+        noAck: false
       });
-      conn.on('close', () => {
-        logger.warn('RabbitMQ connection closed');
-        this.scheduleRetry();
+      
+      this.isConnected = true;
+      logger.info('✅ MessageConsumer connected to RabbitMQ');
+      
+      // Handle connection events
+      this.connection.on('error', (error: any) => {
+        logger.error({ error }, '❌ RabbitMQ connection error');
+        this.isConnected = false;
       });
-
-      const ch = await conn.createChannel();
-      this.channel = ch;
-
-      await ch.assertExchange(rabbitMQConfig.exchange, rabbitMQConfig.exchangeType, { durable: true });
-      await ch.assertQueue(rabbitMQConfig.queue, { durable: true });
-
-      for (const key of rabbitMQConfig.routingKeys) {
-        await ch.bindQueue(rabbitMQConfig.queue, rabbitMQConfig.exchange, key);
-      }
-
-      logger.info({ queue: rabbitMQConfig.queue, keys: rabbitMQConfig.routingKeys }, 'User-service consuming');
-
-      await ch.consume(rabbitMQConfig.queue, (msg: ConsumeMessage | null) => this.handleMessage(msg), { noAck: false });
-
-      this.retryCount = 0;
-      if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; }
-    } catch (e) {
-      logger.error({ e }, 'User-service failed to connect RabbitMQ');
-      this.scheduleRetry();
+      
+      this.connection.on('close', () => {
+        logger.warn('⚠️ RabbitMQ connection closed');
+        this.isConnected = false;
+      });
+      
+    } catch (error) {
+      logger.error({ error }, '❌ Failed to start MessageConsumer');
+      throw error;
     }
   }
 
-  private static async handleMessage(msg: ConsumeMessage | null) {
-    if (!msg || !this.channel) return;
+  private static async handleMessage(message: any): Promise<void> {
+    if (!message) return;
+
     try {
-      const routingKey = msg.fields.routingKey;
-      const raw = msg.content.toString();
-      const event = JSON.parse(raw);
-      const messageId = msg.properties.messageId 
-        || crypto.createHash('sha256').update(raw).digest('hex');
-
-      // idempotency
-      const processed = await LoginEventRepository.isProcessed(messageId);
-      if (processed) {
-        this.channel.ack(msg);
-        return;
-      }
-
+      const content = JSON.parse(message.content.toString());
+      const routingKey = message.fields.routingKey;
+      
+      logger.info({ routingKey, content }, 'Received message');
+      
       switch (routingKey) {
-        case 'user.registered': {
-          const userId: string = event.userId;
-          const email: string = event.email;
-          const guessName = email?.split('@')[0] || null;
-          // Create/update user in user_db
-          try {
-            await UserRepository.createOrUpdate(userId, email, guessName);
-            logger.info({ userId, email }, 'User synced to user_db');
-          } catch (error) {
-            logger.warn({ userId, email, error }, 'Could not sync user to user_db');
-          }
-          await LoginEventRepository.markProcessed(messageId, routingKey);
+        case 'user.registered':
+          await this.handleUserRegistered(content);
           break;
-        }
-        case 'user.logged_in': {
-          await LoginEventRepository.recordLogin(event);
-          if (event.userId) {
-            try {
-              await UserRepository.updateLastLogin(event.userId);
-            } catch (error) {
-              logger.warn({ userId: event.userId, error }, 'Could not update last login');
-            }
-          }
-          await LoginEventRepository.markProcessed(messageId, routingKey);
+        case 'user.logged_in':
+          await this.handleUserLoggedIn(content);
           break;
-        }
+        case 'user.updated':
+          await this.handleUserUpdated(content);
+          break;
         default:
-          // các key khác: bỏ qua nhưng vẫn mark processed để tránh lặp
-          await LoginEventRepository.markProcessed(messageId, routingKey);
+          logger.warn({ routingKey }, 'Unknown routing key');
       }
-
-      this.channel.ack(msg);
-    } catch (err) {
-      logger.error({ err }, 'User-service handleMessage error');
-      // drop để tránh loop vô hạn với dữ liệu xấu
-      this.channel!.nack(msg!, false, false);
+      
+      // Acknowledge message
+      this.channel?.ack(message);
+      
+    } catch (error) {
+      logger.error({ error }, 'Error processing message');
+      // Reject message and don't requeue
+      this.channel?.nack(message, false, false);
     }
   }
 
-  private static scheduleRetry() {
-    if (this.retryCount >= MAX_RETRIES) {
-      logger.error('Max RabbitMQ retries reached');
-      return;
+  private static async handleUserRegistered(data: any): Promise<void> {
+    try {
+      const { userId, email } = data;
+      
+      // Create user profile if doesn't exist
+      try {
+        await UserService.getUserProfile(userId);
+        logger.info({ userId }, 'User profile already exists');
+      } catch (error) {
+        // User doesn't exist, create them
+        await UserService.createUserWithEmail(userId, email);
+        logger.info({ userId, email }, 'Created user profile from auth service');
+      }
+    } catch (error) {
+      logger.error({ error, data }, 'Failed to handle user registered event');
+      throw error;
     }
-    this.retryCount++;
-    void this.cleanup();
-    if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.retryTimer = setTimeout(() => {
-      this.retryTimer = null;
-      void this.start();
-    }, RETRY_DELAY_MS);
   }
 
-  private static async cleanup() {
-    if (this.channel) { try { await (this.channel as any).close(); } catch {} finally { this.channel = null; } }
-    if (this.connection) { try { await (this.connection as any).close(); } catch {} finally { this.connection = null; } }
+  private static async handleUserLoggedIn(data: any): Promise<void> {
+    try {
+      const { userId } = data;
+      
+      // Could update last login or other login analytics here
+      logger.info({ userId }, 'User logged in');
+      
+    } catch (error) {
+      logger.error({ error, data }, 'Failed to handle user logged in event');
+      throw error;
+    }
   }
 
-  static async close() {
-    if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; }
-    await this.cleanup();
+  private static async handleUserUpdated(data: any): Promise<void> {
+    try {
+      const { userId, changes } = data;
+      
+      // Handle user profile updates from other services
+      logger.info({ userId, changes }, 'User updated from external service');
+      
+    } catch (error) {
+      logger.error({ error, data }, 'Failed to handle user updated event');
+      throw error;
+    }
+  }
+
+  static async close(): Promise<void> {
+    try {
+      if (this.channel) {
+        await this.channel.close();
+        this.channel = null;
+      }
+      
+      if (this.connection) {
+        await this.connection.close();
+        this.connection = null;
+      }
+      
+      this.isConnected = false;
+      logger.info('🔒 MessageConsumer disconnected from RabbitMQ');
+      
+    } catch (error) {
+      logger.error({ error }, 'Error closing MessageConsumer');
+    }
+  }
+
+  static get connected(): boolean {
+    return this.isConnected;
   }
 }
