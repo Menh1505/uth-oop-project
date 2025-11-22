@@ -9,16 +9,15 @@ export interface JwtClaims {
 }
 // Food interface
 export interface Food {
-  id: string;
-  food_id?: string;
+  food_id: string;
   food_name: string;
-  category: string;
-  serving_size: number;
-  serving_unit: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
+  category?: string;
+  serving_size?: number;
+  serving_unit?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
   fiber?: number;
   sugar?: number;
   sodium?: number;
@@ -29,8 +28,7 @@ export interface Food {
   iron?: number;
   barcode?: string;
   brand?: string;
-  food_category?: string;
-  allergens?: string[];
+  allergens?: string;
   is_vegetarian?: boolean;
   is_vegan?: boolean;
   is_gluten_free?: boolean;
@@ -43,13 +41,14 @@ export interface Food {
 // Create Food payload
 export interface CreateFoodPayload {
   food_name: string;
-  category: string;
-  serving_size: number;
+  category?: string;
+  food_category?: string;
+  serving_size?: number;
   serving_unit?: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
   fiber?: number;
   sugar?: number;
   sodium?: number;
@@ -60,8 +59,7 @@ export interface CreateFoodPayload {
   iron?: number;
   barcode?: string;
   brand?: string;
-  food_category?: string;
-  allergens?: string[];
+  allergens?: string;
   is_vegetarian?: boolean;
   is_vegan?: boolean;
   is_gluten_free?: boolean;
@@ -87,6 +85,12 @@ export interface UpdateFoodPayload {
   calcium?: number;
   iron?: number;
   barcode?: string;
+  brand?: string;
+  allergens?: string;
+  is_vegetarian?: boolean;
+  is_vegan?: boolean;
+  is_gluten_free?: boolean;
+  image_url?: string;
 }
 
 // Food search filters
@@ -111,17 +115,20 @@ export interface FoodSearchFilters {
 
 // Meal interface
 export interface Meal {
-  id: string;
+  meal_id: string;
   user_id: string;
-  meal_name: string;
-  meal_type: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+  meal_name?: string;
+  meal_type: string;
   meal_date: string;
   meal_time?: string;
   total_calories?: number;
   total_protein?: number;
   total_carbs?: number;
   total_fat?: number;
+  total_fiber?: number;
+  total_sugar?: number;
   notes?: string;
+  is_completed?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -133,7 +140,7 @@ export interface MealWithFoods extends Meal {
 
 // Meal Food relation
 export interface MealFood {
-  id: string;
+  meal_food_id: string;
   meal_id: string;
   food_id: string;
   quantity: number;
@@ -150,9 +157,6 @@ export interface MealFood {
 
 // Meal Food with details
 export interface MealFoodWithDetails extends MealFood {
-  meal_food_id?: string;
-}
-export interface MealFoodWithDetails extends MealFood {
   nutrition_details?: {
     calories: number;
     protein: number;
@@ -163,8 +167,8 @@ export interface MealFoodWithDetails extends MealFood {
 
 // Create Meal payload
 export interface CreateMealPayload {
-  meal_name: string;
-  meal_type: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+  meal_name?: string;
+  meal_type: string;
   meal_date: string;
   meal_time?: string;
   notes?: string;
@@ -173,7 +177,7 @@ export interface CreateMealPayload {
 // Update Meal payload
 export interface UpdateMealPayload {
   meal_name?: string;
-  meal_type?: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+  meal_type?: string;
   meal_date?: string;
   meal_time?: string;
   notes?: string;

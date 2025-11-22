@@ -163,13 +163,13 @@ export class FoodService {
       throw new Error('Quantity must be greater than 0');
     }
 
-    const ratio = quantity / food.serving_size;
+    const ratio = quantity / (food.serving_size || 1);
 
     return {
-      calories: Math.round(food.calories * ratio * 100) / 100,
-      protein: Math.round(food.protein * ratio * 100) / 100,
-      carbs: Math.round(food.carbs * ratio * 100) / 100,
-      fat: Math.round(food.fat * ratio * 100) / 100,
+      calories: Math.round((food.calories || 0) * ratio * 100) / 100,
+      protein: Math.round((food.protein || 0) * ratio * 100) / 100,
+      carbs: Math.round((food.carbs || 0) * ratio * 100) / 100,
+      fat: Math.round((food.fat || 0) * ratio * 100) / 100,
       fiber: Math.round((food.fiber || 0) * ratio * 100) / 100,
       sugar: Math.round((food.sugar || 0) * ratio * 100) / 100,
       sodium: Math.round((food.sodium || 0) * ratio * 100) / 100,
