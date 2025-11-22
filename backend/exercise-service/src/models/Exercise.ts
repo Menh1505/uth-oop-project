@@ -170,11 +170,12 @@ export interface CalorieBurnFactors {
 
 // JWT Claims
 export interface JwtClaims {
-  sub: string;
   id: string;
   email: string;
-  iat: number;
-  exp: number;
+  role: string;
+  iat?: number;
+  exp?: number;
   iss?: string;
   aud?: string;
+  jti?: string;
 }
