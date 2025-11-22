@@ -49,34 +49,6 @@ export class AuthController {
     res.json({ access_token: result.access_token, expires_at: result.expires_at, refresh_token: result.refresh_token, token_type: 'Bearer' });
   }
 
-	static async googleLogin(req: Request, res: Response) {
-		try {
-			const idToken = (req.body?.idToken as string) || (req.body?.id_token as string);
-			if (!idToken) {
-				return res.status(400).json({ message: 'idToken is required' });
-			}
-
-			const result = await AuthService.loginWithGoogle(idToken);
-
-			res.cookie('refresh_token', result.refresh_token, {
-				httpOnly: true,
-				secure: !!process.env.COOKIE_SECURE,
-				sameSite: 'lax',
-				maxAge: parseInt(process.env.REFRESH_TTL_SEC || `${60 * 60 * 24 * 30}`, 10) * 1000,
-				path: '/auth',
-			});
-			res.json({
-				access_token: result.access_token,
-				expires_at: result.expires_at,
-				refresh_token: result.refresh_token,
-				token_type: 'Bearer',
-			});
-		} catch (e: any) {
-			console.error('Google login error:', e);
-			res.status(401).json({ message: e.message || 'Google login failed' });
-		}
-	}
-
   static async adminLogin(req: Request, res: Response) {
     const { username, password } = req.body || {};
     if (!username || !password) return res.status(400).json({ message: 'Username and password required' });
@@ -147,29 +119,6 @@ export class AuthController {
     }
   }
 
-  static async verify(req: Request, res: Response) {
-    try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ message: 'Authorization token required' });
-      const token = authHeader.substring(7);
-
-      // Check blacklist trước rồi verify
-      const rows = (await (await import('../config/database')).default.query(
-        'SELECT token_hash FROM token_blacklist WHERE expires_at > NOW()'
-      )).rows;
-      for (const r of rows) {
-        if (await (await import('bcryptjs')).default.compare(token, r.token_hash)) {
-          return res.status(401).json({ message: 'Token revoked' });
-        }
-      }
-
-      const decoded = jwt.verify(token, jwtConfig.secret, { issuer: jwtConfig.issuer, audience: jwtConfig.audience }) as any;
-      res.json({ valid: true, claims: { id: decoded.id, email: decoded.email, role: decoded.role, jti: decoded.jti, exp: decoded.exp } });
-    } catch {
-      res.status(401).json({ valid: false, message: 'Invalid token' });
-    }
-  }
-
   // ===== sessions =====
   static async listSessions(req: Request, res: Response) {
     const refresh = (req.cookies?.refresh_token as string) || (req.body?.refresh_token as string) || undefined;
@@ -186,7 +135,8 @@ export class AuthController {
   static async deleteOtherSessions(req: Request, res: Response) {
     const all = String(req.query.all || '') === '1';
     if (all) {
-      await (await import('../config/database')).default.query('DELETE FROM sessions');
+      const { Session } = await import('../models/User');
+      await Session.deleteMany({});
       return res.status(204).send();
     }
     const refresh = (req.cookies?.refresh_token as string) || (req.body?.refresh_token as string) || undefined;
@@ -208,6 +158,61 @@ export class AuthController {
       res.status(201).json({ success: true });
     } catch {
       res.status(400).json({ message: 'Invalid access token' });
+    }
+  }
+
+  static async googleLogin(req: Request, res: Response) {
+    try {
+      const idToken = (req.body?.idToken as string) || (req.body?.id_token as string);
+      if (!idToken) {
+        return res.status(400).json({ message: 'idToken is required' });
+      }
+
+      const result = await AuthService.loginWithGoogle(idToken);
+
+      res.cookie('refresh_token', result.refresh_token, {
+        httpOnly: true,
+        secure: !!process.env.COOKIE_SECURE,
+        sameSite: 'lax',
+        maxAge: parseInt(process.env.REFRESH_TTL_SEC || `${60 * 60 * 24 * 30}`, 10) * 1000,
+        path: '/auth',
+      });
+      res.json({
+        access_token: result.access_token,
+        expires_at: result.expires_at,
+        refresh_token: result.refresh_token,
+        token_type: 'Bearer',
+      });
+    } catch (e: any) {
+      console.error('Google login error:', e);
+      res.status(401).json({ message: e.message || 'Google login failed' });
+    }
+  }
+
+  static async verify(req: Request, res: Response) {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ message: 'Authorization token required' });
+      const token = authHeader.substring(7);
+
+      // Check blacklist với MongoDB
+      const bcrypt = await import('bcryptjs');
+      const { TokenBlacklist } = await import('../models/User');
+      
+      const blacklistedTokens = await TokenBlacklist.find({ 
+        expires_at: { $gt: new Date() } 
+      }).select('token_hash').lean();
+      
+      for (const blacklisted of blacklistedTokens) {
+        if (await bcrypt.default.compare(token, blacklisted.token_hash)) {
+          return res.status(401).json({ message: 'Token revoked' });
+        }
+      }
+
+      const decoded = jwt.verify(token, jwtConfig.secret, { issuer: jwtConfig.issuer, audience: jwtConfig.audience }) as any;
+      res.json({ valid: true, claims: { id: decoded.id, email: decoded.email, role: decoded.role, jti: decoded.jti, exp: decoded.exp } });
+    } catch {
+      res.status(401).json({ valid: false, message: 'Invalid token' });
     }
   }
 }
