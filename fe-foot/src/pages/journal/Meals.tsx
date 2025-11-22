@@ -5,10 +5,6 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
 import type { MealLog } from "../../types";
 
-const API_GATEWAY =
-  (import.meta as any).env?.VITE_API_GATEWAY_URL?.replace(/\/$/, "") ||
-  window.location.origin; // fallback: origin hiện tại
-
 const MEAL_BASE = `http://localhost:3000/api/meals`;
 type MealType = "Breakfast" | "Lunch" | "Dinner" | "Snack";
 
