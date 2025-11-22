@@ -236,7 +236,7 @@ export class GoalController {
 
   assignGoalToUser = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.user_id;
+      const userId = req.user?.id;
       if (!userId) {
         const response: GoalApiResponse<null> = {
           success: false,
@@ -272,7 +272,7 @@ export class GoalController {
 
   getUserGoals = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.user_id;
+      const userId = req.user?.id;
       if (!userId) {
         const response: GoalApiResponse<null> = {
           success: false,
@@ -506,7 +506,7 @@ export class GoalController {
 
   getUserGoalStatistics = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.user_id;
+      const userId = req.user?.id;
       if (!userId) {
         const response: GoalApiResponse<null> = {
           success: false,
@@ -539,7 +539,7 @@ export class GoalController {
 
   getActiveGoalsNearDeadline = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.user_id;
+      const userId = req.user?.id;
       if (!userId) {
         const response: GoalApiResponse<null> = {
           success: false,
@@ -574,7 +574,7 @@ export class GoalController {
 
   getRecentGoalActivity = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.user_id;
+      const userId = req.user?.id;
       if (!userId) {
         const response: GoalApiResponse<null> = {
           success: false,
@@ -611,7 +611,7 @@ export class GoalController {
 
   getGoalRecommendations = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.user_id;
+      const userId = req.user?.id;
       if (!userId) {
         const response: GoalApiResponse<null> = {
           success: false,
@@ -717,7 +717,7 @@ export class GoalController {
 
   getSmartGoalSuggestions = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const userId = req.user?.user_id;
+      const userId = req.user?.id;
       if (!userId) {
         const response: GoalApiResponse<null> = {
           success: false,

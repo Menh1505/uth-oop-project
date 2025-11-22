@@ -5,11 +5,12 @@
 export interface JwtClaims {
   id: string;           // user id
   email: string;        // email
-  role?: string;        // 'user' | 'admin' | ...
+  role: string;         // 'user' | 'admin' | ...
   iat?: number;         // issued at
   exp?: number;         // expiry
   iss?: string;         // issuer
   aud?: string | string[]; // audience
+  jti?: string;         // JWT ID
 }
 export interface User {
   user_id: string;
