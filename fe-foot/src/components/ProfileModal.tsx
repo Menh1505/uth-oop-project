@@ -6,14 +6,8 @@ import { ApiClient } from "../lib/api/client";
 
 // Mở rộng thêm các field backend trả về
 type CombinedProfile = UserProfile & {
-  gender?: string | null;
-  age?: number | null;
-  weight?: string | null;
-  height?: string | null;
-  fitness_goal?: string | null;
   preferred_diet?: string | null;
   subscription_status?: string | null;
-  profile_picture_url?: string | null;
 };
 
 interface ProfileModalProps {
@@ -74,14 +68,22 @@ export default function ProfileModal({
           user_id: user.user_id,
           name: user.name,
           email: user.email,
-          gender: user.gender,
+          profile_picture_url: user.profile_picture_url,
           age: user.age,
-          weight: user.weight,
+          gender: user.gender,
           height: user.height,
-          fitness_goal: user.fitness_goal,
+          weight: user.weight,
+          activity_level: user.activity_level,
+          dietary_restrictions: user.dietary_restrictions || [],
+          allergies: user.allergies || [],
+          health_conditions: user.health_conditions || [],
+          fitness_goals: user.fitness_goals || [],
+          is_premium: user.is_premium || false,
+          subscription_expires_at: user.subscription_expires_at,
+          created_at: user.created_at,
+          updated_at: user.updated_at,
           preferred_diet: user.preferred_diet,
           subscription_status: user.subscription_status,
-          profile_picture_url: user.profile_picture_url,
         };
 
         setServerProfile(hydrated);
@@ -156,10 +158,9 @@ export default function ProfileModal({
     (displayProfile as any).avatar ||
     null;
 
-  const goalText =
-    displayProfile.fitness_goal ||
-    (displayProfile as any).goal ||
-    "Chưa đặt mục tiêu";
+  const goalText = displayProfile.fitness_goals?.length > 0 
+    ? displayProfile.fitness_goals.join(', ')
+    : "Chưa đặt mục tiêu";
 
   return (
     <>

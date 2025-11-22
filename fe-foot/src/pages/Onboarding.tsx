@@ -1,4 +1,3 @@
-import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
@@ -7,6 +6,12 @@ import { useAppStore } from "../store/useAppStore";
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiClient } from "../lib/api/client";
+
+// Store-specific profile type
+type StoreUserProfile = UserProfile & {
+  needsOnboarding?: boolean;
+  role?: string;
+};
 
 export default function Onboarding() {
   const { completeOnboarding } = useAppStore();
@@ -42,6 +47,10 @@ export default function Onboarding() {
         height: fd.get("height")
           ? parseFloat(fd.get("height")?.toString() || "0")
           : null,
+        dietary_restrictions: [],
+        allergies: [],
+        health_conditions: [],
+        fitness_goals: [],
       };
 
       let avatarUrl: string | null = null;
@@ -64,14 +73,22 @@ export default function Onboarding() {
 
       await ApiClient.put("/users/me", profileData);
 
-      const profile: UserProfile = {
+      const profile: StoreUserProfile = {
+        user_id: '',
         name: profileData.name || "User",
-        avatar: avatarUrl || avatarPreview || undefined,
-        goal: "maintain",
-        diet: "balanced",
-        budgetPerMeal: 90000,
-        timePerWorkout: 30,
-        username: "",
+        email: profileData.email || '',
+        profile_picture_url: avatarUrl || avatarPreview || undefined,
+        age: profileData.age,
+        gender: profileData.gender,
+        height: profileData.height,
+        weight: profileData.weight,
+        dietary_restrictions: profileData.dietary_restrictions,
+        allergies: profileData.allergies,
+        health_conditions: profileData.health_conditions,
+        fitness_goals: profileData.fitness_goals,
+        is_premium: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         role: "user",
         needsOnboarding: false,
       };
@@ -112,10 +129,10 @@ export default function Onboarding() {
   return (
   <div className="min-h-screen bg-slate-100 flex items-center justify-center px-4 py-10">
     <div className="w-full max-w-2xl">
-      <Card
-        title="Hồ Sơ Cá Nhân"
-        className="rounded-3xl border border-slate-200 bg-white shadow-xl px-8 py-10"
-      >
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-xl px-8 py-10">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-slate-800">Hồ Sơ Cá Nhân</h2>
+        </div>
         <form onSubmit={submit} className="space-y-7">
           {/* Error */}
           {error && (
@@ -275,7 +292,7 @@ export default function Onboarding() {
             </Button>
           </div>
         </form>
-      </Card>
+      </div>
     </div>
   </div>
 );

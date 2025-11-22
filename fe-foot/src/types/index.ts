@@ -132,7 +132,7 @@ export type Exercise = {
 };
 
 // Goal Service Types
-export type Goal = {
+export type GoalEntity = {
   goal_id: string; // UUID
   user_id: string; // UUID
   goal_type: string;
@@ -391,7 +391,7 @@ export type GoalStatistics = {
   paused_goals: number;
   cancelled_goals: number;
   completion_rate: number; // percentage
-  goals_near_deadline: Goal[];
+  goals_near_deadline: GoalEntity[];
 };
 
 // Nutrition & Summary Types
@@ -490,8 +490,7 @@ export type RecommendationFilterParams = PaginationQuery & {
   is_read?: boolean;
 };
 
-// Legacy types for backward compatibility (can be removed if not needed)
-export type DietPref = "balanced" | "low_carb" | "keto" | "vegetarian" | "vegan";
+// Legacy types for existing components (minimal set)
 export type OrderStatus = "pending" | "confirmed" | "preparing" | "delivering" | "completed" | "cancelled";
 
 export type MealLog = {

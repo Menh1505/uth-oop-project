@@ -4,14 +4,20 @@ import type { CartItem, MealLog, Order, OrderStatus, UserProfile, WorkoutLog } f
 import { uid, nowISO } from "../lib/uid";
 import { Ctx } from "./useAppStore";
 
+// Extended UserProfile for store with additional UI-specific fields
+type StoreUserProfile = UserProfile & {
+  needsOnboarding?: boolean;
+  role?: string;
+};
+
 export type Store = {
   // auth
   authed: boolean;
   loading: boolean;
-  profile: UserProfile | null;
+  profile: StoreUserProfile | null;
   signIn(): void;
   signOut(): void;
-  completeOnboarding(p: UserProfile): void;
+  completeOnboarding(p: StoreUserProfile): void;
   updateProfile(updates: Partial<UserProfile>): Promise<void>;
   login(username: string, password: string): Promise<void>;
   adminLogin(username: string, password: string): Promise<void>;
@@ -46,7 +52,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   // auth
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(true); // Start loading to check auth
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<StoreUserProfile | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -90,7 +96,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         }
 
         const verifyData = await verifyRes.json();
-        const claims = (verifyData as any).user || (verifyData as any).claims;
+        const verifyResult = verifyData as Record<string, unknown>;
+        const claims = (verifyResult.user || verifyResult.claims || {}) as Record<string, unknown>;
         if (!claims) {
           throw new Error('Missing auth claims');
         }
@@ -108,45 +115,56 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           if (meRes.ok) {
             const profileData = await meRes.json();
             setProfile({
-              name: profileData.user?.name || claims.email || 'User',
-              goal: 'maintain',
-              diet: 'balanced',
-              budgetPerMeal: 50000,
-              timePerWorkout: 60,
-              username: profileData.user?.username || claims.email,
+              user_id: (claims.user_id as string) || '',
+              name: profileData.user?.name || (claims.email as string) || 'User',
+              email: (claims.email as string),
+              dietary_restrictions: [],
+              allergies: [],
+              health_conditions: [],
+              fitness_goals: [],
+              is_premium: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
               role: (profileData.user?.role || claims.role || 'user')
                 .toString()
                 .toLowerCase() === 'admin'
                 ? 'admin'
                 : 'user',
-              // Backend dự kiến trả về needsOnboarding; nếu không có thì fallback false
               needsOnboarding: profileData.needsOnboarding === true,
             });
           } else {
             // Nếu /me lỗi (ví dụ chưa có hồ sơ) -> yêu cầu onboarding
             setProfile({
-              name: claims.email,
-              goal: 'maintain',
-              diet: 'balanced',
-              budgetPerMeal: 50000,
-              timePerWorkout: 60,
-              username: claims.email,
-              role: claims.role === 'admin' ? 'admin' : 'user',
-              needsOnboarding: claims.role !== 'admin',
+              user_id: (claims.user_id as string) || '',
+              name: (claims.email as string),
+              email: (claims.email as string),
+              dietary_restrictions: [],
+              allergies: [],
+              health_conditions: [],
+              fitness_goals: [],
+              is_premium: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              role: (claims.role as string) === 'admin' ? 'admin' : 'user',
+              needsOnboarding: (claims.role as string) !== 'admin',
             });
           }
         } catch (profileErr) {
           console.error('Auth hydrate /users/me error:', profileErr);
           // Nếu không gọi được /me vẫn cho đăng nhập, nhưng bắt đi onboarding lại
           setProfile({
-            name: claims.email,
-            goal: 'maintain',
-            diet: 'balanced',
-            budgetPerMeal: 50000,
-            timePerWorkout: 60,
-            username: claims.email,
-            role: claims.role === 'admin' ? 'admin' : 'user',
-            needsOnboarding: claims.role !== 'admin',
+            user_id: (claims.user_id as string) || '',
+            name: (claims.email as string),
+            email: (claims.email as string),
+            dietary_restrictions: [],
+            allergies: [],
+            health_conditions: [],
+            fitness_goals: [],
+            is_premium: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            role: (claims.role as string) === 'admin' ? 'admin' : 'user',
+            needsOnboarding: (claims.role as string) !== 'admin',
           });
         }
       } catch (error) {
@@ -249,7 +267,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email: username, password }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -274,24 +292,32 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
             const profileData = await profileResponse.json();
             // API returns { success, user, needsOnboarding }
             setProfile({
+              user_id: profileData.user?.user_id || '',
               name: profileData.user?.name || username,
-              goal: 'maintain',
-              diet: 'balanced',
-              budgetPerMeal: 50000,
-              timePerWorkout: 60,
-              username,
+              email: profileData.user?.email || username,
+              dietary_restrictions: profileData.user?.dietary_restrictions || [],
+              allergies: profileData.user?.allergies || [],
+              health_conditions: profileData.user?.health_conditions || [],
+              fitness_goals: profileData.user?.fitness_goals || [],
+              is_premium: profileData.user?.is_premium || false,
+              created_at: profileData.user?.created_at || new Date().toISOString(),
+              updated_at: profileData.user?.updated_at || new Date().toISOString(),
               role: (profileData.user?.role || 'user').toString().toLowerCase() === 'admin' ? 'admin' : 'user',
               needsOnboarding: profileData.needsOnboarding === true
             });
           } else {
             // Profile endpoint failed, set default with onboarding
             setProfile({
+              user_id: '',
               name: username,
-              goal: 'maintain',
-              diet: 'balanced',
-              budgetPerMeal: 50000,
-              timePerWorkout: 60,
-              username,
+              email: username,
+              dietary_restrictions: [],
+              allergies: [],
+              health_conditions: [],
+              fitness_goals: [],
+              is_premium: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
               role: 'user',
               needsOnboarding: true
             });
@@ -300,12 +326,16 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           console.error('Profile fetch error:', profileError);
           // Still logged in, but needs onboarding
           setProfile({
+            user_id: '',
             name: username,
-            goal: 'maintain',
-            diet: 'balanced',
-            budgetPerMeal: 50000,
-            timePerWorkout: 60,
-            username,
+            email: username,
+            dietary_restrictions: [],
+            allergies: [],
+            health_conditions: [],
+            fitness_goals: [],
+            is_premium: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
             role: 'user',
             needsOnboarding: true
           });
@@ -332,7 +362,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email: username, password }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -342,12 +372,16 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setAuthed(true);
         // Set admin profile (admins don't need onboarding)
         setProfile({
+          user_id: '',
           name: username,
-          goal: 'maintain',
-          diet: 'balanced',
-          budgetPerMeal: 50000,
-          timePerWorkout: 60,
-          username,
+          email: username,
+          dietary_restrictions: [],
+          allergies: [],
+          health_conditions: [],
+          fitness_goals: [],
+          is_premium: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
           role: 'admin',
           needsOnboarding: false
         });
@@ -375,7 +409,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, username }),
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          name: username || email.split('@')[0] // Use email prefix if no username provided
+        }),
       });
       console.log('Response status:', response.status);
       if (response.ok) {
@@ -408,16 +446,19 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) return;
       const data = await res.json();
       // Expect { success, meals: [...]} from backend controller
-      const items = (data.meals || []) as any[];
-      const mapped: MealLog[] = items.map((m: any) => ({
-        id: m.meal_id || uid('meal'),
-        name: m.meal_name || m.meal_type || 'Meal',
-        calories: Math.round(m.total_calories || 0),
-        protein: Math.round(m.total_protein || 0),
-        carbs: Math.round(m.total_carbs || 0),
-        fat: Math.round(m.total_fat || 0),
-        time: (m.meal_date ? `${m.meal_date}T${(m.meal_time||'00:00')}:00` : nowISO())
-      }));
+      const items = (data.meals || []) as unknown[];
+      const mapped: MealLog[] = items.map((m: unknown) => {
+        const meal = m as Record<string, unknown>;
+        return {
+          id: (meal.meal_id as string) || uid('meal'),
+          name: (meal.meal_name as string) || (meal.meal_type as string) || 'Meal',
+          calories: Math.round(Number(meal.total_calories) || 0),
+          protein: Math.round(Number(meal.total_protein) || 0),
+          carbs: Math.round(Number(meal.total_carbs) || 0),
+          fat: Math.round(Number(meal.total_fat) || 0),
+          time: meal.meal_date ? `${meal.meal_date}T${(meal.meal_time||'00:00')}:00` : nowISO()
+        };
+      });
       setMeals(mapped);
     } catch (e) {
       console.warn('fetchMeals failed, keep local state', e);
@@ -514,7 +555,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       });
     }, 2000);
     return () => clearInterval(t);
-  }, [order?.id]);
+  }, [order]);  // Include full order object to satisfy linting
 
   const value: Store = {
     authed, loading, profile, signIn, signOut, completeOnboarding, updateProfile, login, adminLogin, loginError, loginLoading, register, registerError, registerLoading, registerSuccess,

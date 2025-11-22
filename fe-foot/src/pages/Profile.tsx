@@ -5,19 +5,13 @@ import { Select } from "../components/ui/Select";
 import { useEffect, useState } from "react";
 import { ApiClient } from "../lib/api/client";
 
-interface UserData {
-  user_id: string;
-  name: string;
-  email: string;
-  gender: string | null;
-  age: number | null;
-  weight: number | null;
-  height: number | null;
-  profile_picture_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  email_verified: boolean;
+import type { UserProfile, UpdateProfileRequest } from "../types";
+
+interface UserData extends UserProfile {
+  // Thêm các fields extra nếu cần
+  email_verified?: boolean;
   last_login?: string;
+  is_active?: boolean;
 }
 
 interface UserGoalSummary {
@@ -38,7 +32,12 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<UserData>>({});
+  const [editForm, setEditForm] = useState<Partial<UserData & {
+    dietary_restrictions?: string[];
+    allergies?: string[];
+    health_conditions?: string[];
+    fitness_goals?: string[];
+  }>>({});
 
   const [userGoal, setUserGoal] = useState<UserGoalSummary | null>(null);
   const [goalLoading, setGoalLoading] = useState(false);
@@ -176,12 +175,17 @@ export default function ProfilePage() {
       setError(null);
       setSuccess(null);
 
-      const updatePayload = {
+      const updatePayload: UpdateProfileRequest = {
         name: editForm.name,
-        gender: editForm.gender,
-        age: editForm.age ? parseInt(editForm.age.toString()) : null,
-        weight: editForm.weight ? parseFloat(editForm.weight.toString()) : null,
-        height: editForm.height ? parseFloat(editForm.height.toString()) : null,
+        gender: editForm.gender as any,
+        age: editForm.age ? parseInt(editForm.age.toString()) : undefined,
+        weight: editForm.weight ? parseFloat(editForm.weight.toString()) : undefined,
+        height: editForm.height ? parseFloat(editForm.height.toString()) : undefined,
+        // Đảm bảo các fields bắt buộc là arrays
+        dietary_restrictions: editForm.dietary_restrictions || [],
+        allergies: editForm.allergies || [],
+        health_conditions: editForm.health_conditions || [],
+        fitness_goals: editForm.fitness_goals || [],
       };
 
       await ApiClient.put("/users/me", updatePayload);

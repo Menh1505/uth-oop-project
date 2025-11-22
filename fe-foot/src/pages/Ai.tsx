@@ -62,16 +62,23 @@ export default function Ai() {
   const useMockSuggestions = () => {
     if (!profile) return;
     const cheap = (profile as any).budgetPerMeal < 90000;
-    const baseMeal =
-      (profile as any).diet === "vegan"
+    // Check dietary preferences from UserProfile
+    const isVegan = profile?.dietary_restrictions?.includes('vegan') || false;
+    const baseMeal = isVegan
         ? { name: "Vegan Protein Bowl", calories: 520, protein: 28, carbs: 65, fat: 12 }
         : { name: "Chicken Brown Rice", calories: 550, protein: 40, carbs: 55, fat: 14 };
     const meal = cheap ? { ...baseMeal, name: baseMeal.name + " (Budget)" } : baseMeal;
 
+    // Check fitness goals from UserProfile
     let workout = { name: "Full-body 30m", caloriesBurned: 250, durationMin: 30 };
-    if ((profile as any).goal === "gain_muscle") workout = { name: "Strength 30m", caloriesBurned: 180, durationMin: 30 };
-    if ((profile as any).goal === "lose_fat") workout = { name: "HIIT 30m", caloriesBurned: 300, durationMin: 30 };
-    if ((profile as any).goal === "endurance") workout = { name: "Zone2 30m", caloriesBurned: 240, durationMin: 30 };
+    const fitnessGoals = profile?.fitness_goals || [];
+    if (fitnessGoals.includes("muscle_gain") || fitnessGoals.includes("strength")) {
+      workout = { name: "Strength 30m", caloriesBurned: 180, durationMin: 30 };
+    } else if (fitnessGoals.includes("weight_loss") || fitnessGoals.includes("fat_loss")) {
+      workout = { name: "HIIT 30m", caloriesBurned: 300, durationMin: 30 };
+    } else if (fitnessGoals.includes("endurance") || fitnessGoals.includes("cardio")) {
+      workout = { name: "Zone2 30m", caloriesBurned: 240, durationMin: 30 };
+    }
 
     setRecommendations([
       {
