@@ -20,12 +20,13 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "fitfood_auth_db" <
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Auth/Login table
-CREATE TABLE IF NOT EXISTS auth_users (
-    user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- Main users table (matching code expectation)
+CREATE TABLE IF NOT EXISTS users_auth (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
+    username VARCHAR(255),
     password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) DEFAULT 'user',
+    status VARCHAR(50) DEFAULT 'active',
     is_active BOOLEAN DEFAULT true,
     email_verified BOOLEAN DEFAULT false,
     last_login TIMESTAMP,
@@ -33,17 +34,70 @@ CREATE TABLE IF NOT EXISTS auth_users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Refresh tokens
-CREATE TABLE IF NOT EXISTS refresh_tokens (
+-- Sessions table for refresh tokens
+CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES auth_users(user_id) ON DELETE CASCADE,
-    token_hash VARCHAR(255) NOT NULL,
+    user_id UUID NOT NULL REFERENCES users_auth(id) ON DELETE CASCADE,
+    refresh_token_hash VARCHAR(255) NOT NULL,
+    user_agent VARCHAR(255),
+    ip INET,
     expires_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+-- Social login identities
+CREATE TABLE IF NOT EXISTS identities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users_auth(id) ON DELETE CASCADE,
+    provider VARCHAR(50) NOT NULL,
+    provider_uid VARCHAR(255) NOT NULL,
+    meta JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(provider, provider_uid)
+);
+
+-- Token blacklist for logout
+CREATE TABLE IF NOT EXISTS token_blacklist (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    token_hash VARCHAR(255) UNIQUE NOT NULL,
+    user_id UUID REFERENCES users_auth(id) ON DELETE CASCADE,
+    expires_at TIMESTAMP NOT NULL,
+    blacklisted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Roles system
+CREATE TABLE IF NOT EXISTS roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users_auth(id) ON DELETE CASCADE,
+    role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    tenant_id UUID,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, role_id, tenant_id)
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_users_auth_email ON users_auth(email);
+CREATE INDEX IF NOT EXISTS idx_users_auth_username ON users_auth(username);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_identities_user_id ON identities(user_id);
+CREATE INDEX IF NOT EXISTS idx_identities_provider ON identities(provider, provider_uid);
+CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires ON token_blacklist(expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
+
+-- Insert default roles
+INSERT INTO roles (name, description) VALUES 
+('user', 'Regular user'),
+('admin', 'Administrator'),
+('premium', 'Premium user')
+ON CONFLICT (name) DO NOTHING;
 EOF
 
 # Initialize User Service Database
