@@ -273,8 +273,8 @@ export class GoalRepository {
     }
 
     // Count query for pagination
-    const countQuery = query.replace(/SELECT.*FROM/, 'SELECT COUNT(*) FROM');
-    const countResult = await this.pool.query(countQuery, values);
+    const countQuery = `SELECT COUNT(*) FROM (${query}) AS count_query`;
+    const countResult = await this.pool.query(countQuery, [...values]);
     const totalCount = parseInt(countResult.rows[0].count);
 
     // Apply sorting

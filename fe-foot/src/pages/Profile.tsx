@@ -43,6 +43,9 @@ export default function ProfilePage() {
   const [userGoal, setUserGoal] = useState<UserGoalSummary | null>(null);
   const [goalLoading, setGoalLoading] = useState(false);
   const [goalError, setGoalError] = useState<string | null>(null);
+  const [goalSetupVisible, setGoalSetupVisible] = useState(false);
+  const [goalSetupWeight, setGoalSetupWeight] = useState<number | null>(null);
+  const [goalSetupDuration, setGoalSetupDuration] = useState<number>(8);
 
   // Fetch user data on mount
   useEffect(() => {
@@ -70,7 +73,9 @@ export default function ProfilePage() {
     try {
       setGoalLoading(true);
       setGoalError(null);
-      const res: any = await ApiClient.get("/goals/user-goals?limit=1&status=Active");
+      const res: any = await ApiClient.get(
+        "/goals/user-goals?limit=1&status=Active"
+      );
       const payload = res?.data || res;
       const first = payload?.goals?.[0];
       if (first && first.goal) {
@@ -95,12 +100,84 @@ export default function ProfilePage() {
     }
   };
 
+  useEffect(() => {
+    if (userGoal) {
+      setGoalSetupWeight(
+        typeof userGoal.target_weight === "number"
+          ? userGoal.target_weight
+          : userGoal.target_weight
+          ? Number(userGoal.target_weight)
+          : null
+      );
+      setGoalSetupDuration(
+        typeof userGoal.target_duration_weeks === "number"
+          ? userGoal.target_duration_weeks
+          : 8
+      );
+    } else {
+      setGoalSetupWeight(null);
+      setGoalSetupDuration(8);
+    }
+  }, [userGoal]);
+
+  const openGoalSetup = () => {
+    setGoalSetupWeight(
+      typeof userGoal?.target_weight === "number"
+        ? userGoal.target_weight
+        : userGoal?.target_weight
+        ? Number(userGoal.target_weight)
+        : userData?.weight || 60
+    );
+    setGoalSetupDuration(
+      typeof userGoal?.target_duration_weeks === "number"
+        ? userGoal.target_duration_weeks
+        : 8
+    );
+    setGoalSetupVisible(true);
+  };
+
+  const closeGoalSetup = () => setGoalSetupVisible(false);
+
+  const adjustWeight = (delta: number) => {
+    setGoalSetupWeight((prev) => {
+      const base =
+        prev ?? userGoal?.target_weight ?? userData?.weight ?? 60;
+      const next = Math.min(200, Math.max(30, Number((base + delta).toFixed(1))));
+      return next;
+    });
+  };
+
+  const adjustDuration = (delta: number) => {
+    setGoalSetupDuration((prev) => Math.min(52, Math.max(1, prev + delta)));
+  };
+
+  const applyGoalSetup = () => {
+    setUserGoal((prev) =>
+      prev
+        ? {
+            ...prev,
+            target_weight: goalSetupWeight ?? prev.target_weight,
+            target_duration_weeks: goalSetupDuration,
+          }
+        : prev
+    );
+    setGoalSetupVisible(false);
+  };
+
   const handleAddGoal = async () => {
     try {
-      const goalType = window.prompt("Nhập loại mục tiêu (vd: Reduce Fat, Build Muscle)", "Reduce Fat");
+      const goalType = window.prompt(
+        "Nhập loại mục tiêu (vd: Reduce Fat, Build Muscle)",
+        "Reduce Fat"
+      );
       if (!goalType) return;
-      const targetWeightStr = window.prompt("Nhập cân nặng mục tiêu (kg)", "65");
-      const targetWeight = targetWeightStr ? parseFloat(targetWeightStr) : undefined;
+      const targetWeightStr = window.prompt(
+        "Nhập cân nặng mục tiêu (kg)",
+        "65"
+      );
+      const targetWeight = targetWeightStr
+        ? parseFloat(targetWeightStr)
+        : undefined;
 
       const createPayload: any = {
         goal_type: goalType,
@@ -180,8 +257,12 @@ export default function ProfilePage() {
         name: editForm.name,
         gender: editForm.gender,
         age: editForm.age ? parseInt(editForm.age.toString()) : null,
-        weight: editForm.weight ? parseFloat(editForm.weight.toString()) : null,
-        height: editForm.height ? parseFloat(editForm.height.toString()) : null,
+        weight: editForm.weight
+          ? parseFloat(editForm.weight.toString())
+          : null,
+        height: editForm.height
+          ? parseFloat(editForm.height.toString())
+          : null,
       };
 
       await ApiClient.put("/users/me", updatePayload);
@@ -191,7 +272,9 @@ export default function ProfilePage() {
               ...prev,
               name: editForm.name || prev.name,
               gender: editForm.gender || prev.gender,
-              age: editForm.age ? parseInt(editForm.age.toString()) : prev.age,
+              age: editForm.age
+                ? parseInt(editForm.age.toString())
+                : prev.age,
               weight: editForm.weight
                 ? parseFloat(editForm.weight.toString())
                 : prev.weight,
@@ -238,8 +321,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-3xl">
+    <div className="min-h-screen bg-slate-950 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 px-4 py-6">
+      <div className="w-full max-w-5xl mx-auto">
         <Card
           title="Hồ sơ cá nhân"
           // nếu Card support className thì thêm vào:
@@ -247,22 +330,22 @@ export default function ProfilePage() {
         >
           {/* Error/Success Messages */}
           {error && (
-            <div className="mb-4 flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-200">
+            <div className="mb-3 flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 text-sm text-red-200">
               <span className="mt-[2px] text-base">⚠️</span>
               <p>{error}</p>
             </div>
           )}
           {success && (
-            <div className="mb-4 flex items-start gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-200">
+            <div className="mb-3 flex items-start gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-2.5 text-sm text-emerald-200">
               <span className="mt-[2px] text-base">✅</span>
               <p>{success}</p>
             </div>
           )}
 
           {/* Profile Header with Avatar */}
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 pb-6 border-b border-slate-800/70">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-5 pb-5 border-b border-slate-800/70">
             <div className="relative">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-400 via-sky-500 to-indigo-500 p-[3px] shadow-lg shadow-emerald-500/30">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-400 via-sky-500 to-indigo-500 p-[3px] shadow-lg shadow-emerald-500/30">
                 <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
                   {userData.profile_picture_url ? (
                     <img
@@ -277,18 +360,18 @@ export default function ProfilePage() {
                   )}
                 </div>
               </div>
-              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[11px] rounded-full bg-slate-900 px-3 py-1 border border-slate-700 text-slate-200 shadow-sm">
+              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[10px] rounded-full bg-slate-900 px-2 py-0.5 border border-slate-700 text-slate-200 shadow-sm">
                 Ảnh đại diện
               </div>
             </div>
 
-            <div className="flex-1 text-center md:text-left pt-2 md:pt-0">
+            <div className="flex-1 text-center md:text-left pt-3 md:pt-0">
               {isEditing ? (
                 <Input
                   value={editForm.name || ""}
                   onChange={(e) => handleEditChange("name", e.target.value)}
                   placeholder="Họ và tên"
-                  className="mb-2 h-11 rounded-xl border-slate-700 bg-slate-900 text-xl font-semibold text-slate-50 placeholder:text-slate-500"
+                  className="mb-1.5 h-10 rounded-xl border-slate-700 bg-slate-900 text-xl font-semibold text-slate-50 placeholder:text-slate-500"
                 />
               ) : (
                 <div className="text-2xl md:text-3xl font-semibold text-slate-50 tracking-tight">
@@ -304,7 +387,7 @@ export default function ProfilePage() {
                 </span>
               </div>
 
-              <div className="mt-3 flex flex-wrap items-center justify-center md:justify-start gap-2">
+              <div className="mt-2.5 flex flex-wrap items-center justify-center md:justify-start gap-2">
                 {userData.email_verified && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-300 border border-emerald-500/30">
                     <span>✔</span> Email đã xác thực
@@ -319,309 +402,445 @@ export default function ProfilePage() {
             {!isEditing ? (
               <Button
                 onClick={() => setIsEditing(true)}
-                className="mt-2 h-10 rounded-xl px-4 text-sm font-medium shadow-sm bg-sky-500 hover:bg-sky-400"
+                className="mt-2 h-9 rounded-xl px-4 text-sm font-medium shadow-sm bg-sky-500 hover:bg-sky-400"
               >
                 Chỉnh sửa hồ sơ
               </Button>
             ) : null}
           </div>
 
-          {/* User Information */}
-          <div className="py-6 space-y-6">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">
-                Thông tin cá nhân
-              </h3>
-              <div className="h-px flex-1 bg-gradient-to-r from-slate-700 via-slate-800 to-transparent" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Gender */}
-              <div className="space-y-2">
-                <label className="block text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Giới tính
-                </label>
-                {isEditing ? (
-                  <Select
-                    value={editForm.gender || ""}
-                    onChange={(e) => handleEditChange("gender", e.target.value)}
-                    className="h-10 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50"
-                  >
-                    <option value="">Không chọn</option>
-                    <option value="Male">Nam</option>
-                    <option value="Female">Nữ</option>
-                    <option value="Other">Khác</option>
-                  </Select>
-                ) : (
-                  <div className="inline-flex items-center rounded-xl bg-slate-900/60 px-3 py-2 text-sm text-slate-100 border border-slate-700/70">
-                    {userData.gender
-                      ? {
-                          Male: "Nam",
-                          Female: "Nữ",
-                          Other: "Khác",
-                        }[userData.gender]
-                      : "Chưa cập nhật"}
-                  </div>
-                )}
-              </div>
-
-              {/* Age */}
-              <div className="space-y-2">
-                <label className="block text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Tuổi
-                </label>
-                {isEditing ? (
-                  <Input
-                    type="number"
-                    min="13"
-                    max="120"
-                    value={editForm.age || ""}
-                    onChange={(e) => handleEditChange("age", e.target.value)}
-                    placeholder="Nhập tuổi"
-                    className="h-10 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50"
-                  />
-                ) : (
-                  <div className="inline-flex items-center rounded-xl bg-slate-900/60 px-3 py-2 text-sm text-slate-100 border border-slate-700/70">
-                    {userData.age ? `${userData.age} tuổi` : "Chưa cập nhật"}
-                  </div>
-                )}
-              </div>
-
-              {/* Weight */}
-              <div className="space-y-2">
-                <label className="block text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Cân nặng (kg)
-                </label>
-                {isEditing ? (
-                  <Input
-                    type="number"
-                    min="20"
-                    max="200"
-                    step="0.1"
-                    value={editForm.weight || ""}
-                    onChange={(e) => handleEditChange("weight", e.target.value)}
-                    placeholder="Nhập cân nặng"
-                    className="h-10 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50"
-                  />
-                ) : (
-                  <div className="inline-flex items-center rounded-xl bg-slate-900/60 px-3 py-2 text-sm text-slate-100 border border-slate-700/70">
-                    {userData.weight
-                      ? `${userData.weight} kg`
-                      : "Chưa cập nhật"}
-                  </div>
-                )}
-              </div>
-
-              {/* Height */}
-              <div className="space-y-2">
-                <label className="block text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Chiều cao (cm)
-                </label>
-                {isEditing ? (
-                  <Input
-                    type="number"
-                    min="100"
-                    max="250"
-                    step="0.1"
-                    value={editForm.height || ""}
-                    onChange={(e) => handleEditChange("height", e.target.value)}
-                    placeholder="Nhập chiều cao"
-                    className="h-10 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50"
-                  />
-                ) : (
-                  <div className="inline-flex items-center rounded-xl bg-slate-900/60 px-3 py-2 text-sm text-slate-100 border border-slate-700/70">
-                    {userData.height
-                      ? `${userData.height} cm`
-                      : "Chưa cập nhật"}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* BMI Calculation */}
-            {userData.weight && userData.height && (
-              <div className="mt-2 rounded-2xl border border-sky-500/30 bg-sky-500/5 px-4 py-4">
-                <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase mb-2">
-                  Chỉ số BMI
+          {/* Main content: 2 cột trên màn hình lớn */}
+          <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2.2fr)]">
+            {/* LEFT: Thông tin cá nhân + BMI */}
+            <div className="space-y-5">
+              {/* User Information */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">
+                    Thông tin cá nhân
+                  </h3>
+                  <div className="h-px flex-1 bg-gradient-to-r from-slate-700 via-slate-800 to-transparent" />
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-3xl font-bold text-sky-400 tabular-nums">
-                    {(
-                      userData.weight /
-                      (userData.height / 100) ** 2
-                    ).toFixed(1)}
-                  </div>
-                  <div className="space-y-1 text-sm text-slate-200">
-                    <div>
-                      {(() => {
-                        const bmi =
-                          userData.weight /
-                          (userData.height / 100) ** 2;
-                        if (bmi < 18.5) return "Cân nặng thấp (gầy)";
-                        if (bmi < 25) return "Bình thường";
-                        if (bmi < 30) return "Thừa cân";
-                        return "Béo phì";
-                      })()}
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      Duy trì ăn uống và luyện tập đều đặn để giữ sức khỏe ổn định.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Goals section under personal info */}
-          <div className="py-6 border-t border-slate-800/70 space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">
-                Mục tiêu cá nhân
-              </h3>
-              <div className="h-px flex-1 bg-gradient-to-r from-slate-700 via-slate-800 to-transparent" />
-            </div>
-
-            {goalLoading ? (
-              <div className="text-sm text-slate-400">Đang tải mục tiêu...</div>
-            ) : (
-              <>
-                {goalError && (
-                  <div className="text-xs text-yellow-400">{goalError}</div>
-                )}
-
-                {userGoal ? (
-                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-4 space-y-1">
-                    <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">
-                      {userGoal.goal_type}
-                    </div>
-                    {userGoal.description && (
-                      <div className="text-sm text-slate-100">
-                        {userGoal.description}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Gender */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                      Giới tính
+                    </label>
+                    {isEditing ? (
+                      <Select
+                        value={editForm.gender || ""}
+                        onChange={(e) =>
+                          handleEditChange("gender", e.target.value)
+                        }
+                        className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50"
+                      >
+                        <option value="">Không chọn</option>
+                        <option value="Male">Nam</option>
+                        <option value="Female">Nữ</option>
+                        <option value="Other">Khác</option>
+                      </Select>
+                    ) : (
+                      <div className="inline-flex items-center rounded-xl bg-slate-900/60 px-3 py-1.5 text-sm text-slate-100 border border-slate-700/70">
+                        {userData.gender
+                          ? {
+                              Male: "Nam",
+                              Female: "Nữ",
+                              Other: "Khác",
+                            }[userData.gender]
+                          : "Chưa cập nhật"}
                       </div>
                     )}
-                    <div className="text-xs text-slate-400">
-                      Tiến độ:{" "}
-                      <span className="text-emerald-300 font-semibold">
-                        {Math.round(userGoal.progress_percentage)}%
-                      </span>
-                      {userGoal.target_weight && (
-                        <span className="ml-2">
-                          · Cân nặng mục tiêu: {userGoal.target_weight} kg
-                        </span>
-                      )}
-                      {userGoal.target_duration_weeks && (
-                        <span className="ml-2">
-                          · Thời gian: {userGoal.target_duration_weeks} tuần
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      Trạng thái: {userGoal.status}
-                    </div>
                   </div>
-                ) : (
-                  <div className="text-sm text-slate-400">
-                    Bạn chưa có mục tiêu nào. Hãy thêm một mục tiêu để FitFood
-                    theo dõi cho bạn.
-                  </div>
-                )}
 
-                <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                  <Button
-                    onClick={handleAddGoal}
-                    className="flex-1 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-medium"
-                  >
-                    Thêm mục tiêu
-                  </Button>
-                  {userGoal && (
-                    <>
-                      <Button
-                        variant="secondary"
-                        onClick={handleUpdateGoal}
-                        className="flex-1 h-10 rounded-xl text-sm font-medium"
-                      >
-                        Sửa mục tiêu
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={handleDeleteGoal}
-                        className="flex-1 h-10 rounded-xl text-sm font-medium"
-                      >
-                        Xóa mục tiêu
-                      </Button>
-                    </>
-                  )}
+                  {/* Age */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                      Tuổi
+                    </label>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        min="13"
+                        max="120"
+                        value={editForm.age || ""}
+                        onChange={(e) =>
+                          handleEditChange("age", e.target.value)
+                        }
+                        placeholder="Nhập tuổi"
+                        className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50"
+                      />
+                    ) : (
+                      <div className="inline-flex items-center rounded-xl bg-slate-900/60 px-3 py-1.5 text-sm text-slate-100 border border-slate-700/70">
+                        {userData.age ? `${userData.age} tuổi` : "Chưa cập nhật"}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Weight */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                      Cân nặng (kg)
+                    </label>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        min="20"
+                        max="200"
+                        step="0.1"
+                        value={editForm.weight || ""}
+                        onChange={(e) =>
+                          handleEditChange("weight", e.target.value)
+                        }
+                        placeholder="Nhập cân nặng"
+                        className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50"
+                      />
+                    ) : (
+                      <div className="inline-flex items-center rounded-xl bg-slate-900/60 px-3 py-1.5 text-sm text-slate-100 border border-slate-700/70">
+                        {userData.weight
+                          ? `${userData.weight} kg`
+                          : "Chưa cập nhật"}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Height */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                      Chiều cao (cm)
+                    </label>
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        min="100"
+                        max="250"
+                        step="0.1"
+                        value={editForm.height || ""}
+                        onChange={(e) =>
+                          handleEditChange("height", e.target.value)
+                        }
+                        placeholder="Nhập chiều cao"
+                        className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50"
+                      />
+                    ) : (
+                      <div className="inline-flex items-center rounded-xl bg-slate-900/60 px-3 py-1.5 text-sm text-slate-100 border border-slate-700/70">
+                        {userData.height
+                          ? `${userData.height} cm`
+                          : "Chưa cập nhật"}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </>
-            )}
-          </div>
+              </div>
 
-          {/* Account Info */}
-          <div className="py-6 border-t border-slate-800/70 space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">
-                Thông tin tài khoản
-              </h3>
-              <div className="h-px flex-1 bg-gradient-to-r from-slate-700 via-slate-800 to-transparent" />
+              {/* BMI Calculation */}
+              {userData.weight && userData.height && (
+                <div className="rounded-2xl border border-sky-500/30 bg-sky-500/5 px-4 py-3">
+                  <div className="text-[11px] font-semibold tracking-wide text-slate-300 uppercase mb-1.5">
+                    Chỉ số BMI
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-2xl font-bold text-sky-400 tabular-nums">
+                      {(
+                        userData.weight /
+                        (userData.height / 100) ** 2
+                      ).toFixed(1)}
+                    </div>
+                    <div className="space-y-0.5 text-sm text-slate-200">
+                      <div>
+                        {(() => {
+                          const bmi =
+                            userData.weight /
+                            (userData.height / 100) ** 2;
+                          if (bmi < 18.5) return "Cân nặng thấp (gầy)";
+                          if (bmi < 25) return "Bình thường";
+                          if (bmi < 30) return "Thừa cân";
+                          return "Béo phì";
+                        })()}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        Duy trì ăn uống và luyện tập đều đặn để giữ sức khỏe ổn
+                        định.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-              <div className="space-y-1">
-                <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Email đăng nhập
-                </div>
-                <div className="font-medium text-slate-100">
-                  {userData.email}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Trạng thái
-                </div>
-                <div className="font-medium">
-                  {userData.is_active ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300 border border-emerald-500/40">
-                      <span className="text-[11px]">●</span> Hoạt động
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-3 py-1 text-xs text-red-300 border border-red-500/40">
-                      <span className="text-[11px]">●</span> Bị khóa
-                    </span>
+            {/* RIGHT: Goals + Account info */}
+            <div className="space-y-5">
+              {/* Goals section */}
+              <div className="space-y-4 rounded-2xl border border-slate-800/70 bg-slate-900/70 px-4 py-4">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">
+                    Mục tiêu cá nhân
+                  </h3>
+                  {(!userGoal ||
+                    (userGoal.goal_type || "")
+                      .toLowerCase()
+                      .includes("maintain")) && (
+                    <button
+                      type="button"
+                      onClick={openGoalSetup}
+                      className="flex items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition"
+                    >
+                      <span className="text-base leading-none mr-1">＋</span>
+                      Setup
+                    </button>
                   )}
                 </div>
+
+                {goalLoading ? (
+                  <div className="text-sm text-slate-400">
+                    Đang tải mục tiêu...
+                  </div>
+                ) : (
+                  <div
+                    className={`grid gap-4 ${
+                      goalSetupVisible ? "lg:grid-cols-2" : ""
+                    }`}
+                  >
+                    <div
+                      className={`space-y-3 ${
+                        goalSetupVisible ? "" : "lg:col-span-2"
+                      }`}
+                    >
+                      {goalError && (
+                        <div className="text-xs text-yellow-400">
+                          {goalError}
+                        </div>
+                      )}
+
+                      {userGoal ? (
+                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-3.5 py-3 space-y-1">
+                          <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">
+                            {userGoal.goal_type}
+                          </div>
+                          {userGoal.description && (
+                            <div className="text-sm text-slate-100">
+                              {userGoal.description}
+                            </div>
+                          )}
+                          <div className="text-xs text-slate-400">
+                            Tiến độ:{" "}
+                            <span className="text-emerald-300 font-semibold">
+                              {Math.round(userGoal.progress_percentage)}%
+                            </span>
+                            {userGoal.target_weight && (
+                              <span className="ml-2">
+                                · Cân nặng mục tiêu: {userGoal.target_weight} kg
+                              </span>
+                            )}
+                            {userGoal.target_duration_weeks && (
+                              <span className="ml-2">
+                                · Thời gian: {userGoal.target_duration_weeks}{" "}
+                                tuần
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            Trạng thái: {userGoal.status}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-400">
+                          Bạn chưa có mục tiêu nào. Hãy thêm một mục tiêu để
+                          FitFood theo dõi cho bạn.
+                        </div>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <Button
+                          onClick={handleAddGoal}
+                          className="flex-1 h-9 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-medium"
+                        >
+                          Thêm mục tiêu
+                        </Button>
+                        {userGoal && (
+                          <>
+                            <Button
+                              variant="secondary"
+                              onClick={handleUpdateGoal}
+                              className="flex-1 h-9 rounded-xl text-sm font-medium"
+                            >
+                              Sửa mục tiêu
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              onClick={handleDeleteGoal}
+                              className="flex-1 h-9 rounded-xl text-sm font-medium"
+                            >
+                              Xóa mục tiêu
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {goalSetupVisible && (
+                      <div className="rounded-2xl border border-slate-800/70 bg-slate-900 px-3.5 py-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-sm font-semibold text-slate-100">
+                              Thiết lập mục tiêu duy trì
+                            </h4>
+                            <p className="text-[11px] text-slate-400">
+                              Tùy chỉnh nhanh cân nặng và thời gian cho mục tiêu
+                              của bạn
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={closeGoalSetup}
+                            className="text-xs text-slate-400 hover:text-slate-100"
+                          >
+                            Thoát ✕
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-[11px] font-semibold tracking-wide text-slate-300 uppercase">
+                            Cân nặng mong muốn
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => adjustWeight(-0.5)}
+                              className="h-8 w-8 rounded-xl border border-slate-700 text-lg text-slate-100 hover:bg-slate-800"
+                            >
+                              −
+                            </button>
+                            <div className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-center text-lg font-semibold text-slate-50">
+                              {goalSetupWeight !== null
+                                ? `${goalSetupWeight.toFixed(1)} kg`
+                                : "-- kg"}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => adjustWeight(0.5)}
+                              className="h-8 w-8 rounded-xl border border-slate-700 text-lg text-slate-100 hover:bg-slate-800"
+                            >
+                              ＋
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-[11px] font-semibold tracking-wide text-slate-300 uppercase">
+                            Thời gian duy trì (tuần)
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => adjustDuration(-1)}
+                              className="h-8 w-8 rounded-xl border border-slate-700 text-lg text-slate-100 hover:bg-slate-800"
+                            >
+                              −
+                            </button>
+                            <div className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-center text-lg font-semibold text-slate-50">
+                              {goalSetupDuration} tuần
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => adjustDuration(1)}
+                              className="h-8 w-8 rounded-xl border border-slate-700 text-lg text-slate-100 hover:bg-slate-800"
+                            >
+                              ＋
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Button
+                            onClick={applyGoalSetup}
+                            className="flex-1 h-9 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold"
+                          >
+                            Áp dụng
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={closeGoalSetup}
+                            className="flex-1 h-9 rounded-xl text-sm font-semibold"
+                          >
+                            Đóng
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-1">
-                <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Ngày tạo tài khoản
+              {/* Account Info */}
+              <div className="space-y-4 rounded-2xl border border-slate-800/70 bg-slate-900/80 px-4 py-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">
+                    Thông tin tài khoản
+                  </h3>
+                  <div className="h-px flex-1 bg-gradient-to-r from-slate-700 via-slate-800 to-transparent" />
                 </div>
-                <div className="font-medium text-slate-100">
-                  {new Date(userData.created_at).toLocaleDateString("vi-VN")}
-                </div>
-              </div>
 
-              <div className="space-y-1">
-                <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Lần đăng nhập cuối
-                </div>
-                <div className="font-medium text-slate-100">
-                  {userData.last_login
-                    ? new Date(userData.last_login).toLocaleString("vi-VN")
-                    : "Chưa có"}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-0.5">
+                    <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                      Email đăng nhập
+                    </div>
+                    <div className="font-medium text-slate-100">
+                      {userData.email}
+                    </div>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                      Trạng thái
+                    </div>
+                    <div className="font-medium">
+                      {userData.is_active ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300 border border-emerald-500/40">
+                          <span className="text-[11px]">●</span> Hoạt động
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-3 py-1 text-xs text-red-300 border border-red-500/40">
+                          <span className="text-[11px]">●</span> Bị khóa
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                      Ngày tạo tài khoản
+                    </div>
+                    <div className="font-medium text-slate-100">
+                      {new Date(userData.created_at).toLocaleDateString("vi-VN")}
+                    </div>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                      Lần đăng nhập cuối
+                    </div>
+                    <div className="font-medium text-slate-100">
+                      {userData.last_login
+                        ? new Date(userData.last_login).toLocaleString("vi-VN")
+                        : "Chưa có"}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col md:flex-row gap-3 pt-5 border-t border-slate-800/70">
+          <div className="mt-5 pt-4 border-t border-slate-800/70 flex flex-col md:flex-row gap-3">
             {isEditing ? (
               <>
                 <Button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 h-11 rounded-xl font-medium shadow-sm bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="flex-1 h-10 rounded-xl font-medium shadow-sm bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {saving ? "Đang lưu..." : "Lưu thay đổi"}
                 </Button>
@@ -631,7 +850,7 @@ export default function ProfilePage() {
                     setIsEditing(false);
                     setEditForm(userData);
                   }}
-                  className="flex-1 h-11 rounded-xl font-medium border border-slate-700/70 bg-slate-900/80 text-slate-200 hover:bg-slate-800"
+                  className="flex-1 h-10 rounded-xl font-medium border border-slate-700/70 bg-slate-900/80 text-slate-200 hover:bg-slate-800"
                 >
                   Hủy
                 </Button>
@@ -639,7 +858,7 @@ export default function ProfilePage() {
             ) : (
               <Button
                 onClick={() => setIsEditing(true)}
-                className="w-full h-11 rounded-xl font-medium shadow-sm bg-sky-500 hover:bg-sky-400"
+                className="w-full h-10 rounded-xl font-medium shadow-sm bg-sky-500 hover:bg-sky-400"
               >
                 Chỉnh sửa thông tin
               </Button>

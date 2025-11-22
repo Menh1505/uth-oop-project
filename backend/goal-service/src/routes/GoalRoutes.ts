@@ -23,13 +23,6 @@ router.post('/', authenticate, goalController.createGoal);
 router.get('/', authenticate, goalController.getGoals);
 
 /**
- * @route GET /goals/:goalId
- * @description Get goal by ID
- * @access Public
- */
-router.get('/:goalId', goalController.getGoalById);
-
-/**
  * @route PUT /goals/:goalId
  * @description Update goal
  * @access Private (Admin/Staff)
@@ -177,5 +170,12 @@ router.post('/templates/:templateId/create', authenticate, goalController.create
  * @access Private
  */
 router.get('/suggestions/smart', authenticate, goalController.getSmartGoalSuggestions);
+
+/**
+ * @route GET /goals/:goalId
+ * @description Get goal by ID
+ * @access Public
+ */
+router.get('/:goalId', goalController.getGoalById);
 
 export default router;
