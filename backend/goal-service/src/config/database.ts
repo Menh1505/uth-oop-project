@@ -1,13 +1,16 @@
-import { Pool } from 'pg';
+import mongoose from 'mongoose';
+import logger from './logger';
 
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'fitfood_goal_db',
-  password: process.env.DB_PASSWORD || 'password',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  max: 10,
-  idleTimeoutMillis: 30_000,
-});
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:uth@localhost:27017/fitfood_goal_db?authSource=admin';
 
-export default pool;
+export const connectDatabase = async (): Promise<void> => {
+  try {
+    await mongoose.connect(MONGODB_URI);
+    logger.info('Connected to MongoDB successfully');
+  } catch (error) {
+    logger.error({ error }, 'Failed to connect to MongoDB');
+    process.exit(1);
+  }
+};
+
+export default mongoose;

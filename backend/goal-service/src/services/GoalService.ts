@@ -1,161 +1,259 @@
-import { GoalRepository } from '../repositories/GoalRepository';
-import {
+import { v4 as uuidv4 } from 'uuid';
+import { 
+  GoalModel, 
+  UserGoalModel, 
+  IGoal, 
+  IUserGoal,
   Goal,
-  UserGoal,
-  UserGoalWithGoal,
+  GoalType,
   CreateGoalRequest,
   UpdateGoalRequest,
   AssignGoalRequest,
   UpdateUserGoalRequest,
   GoalFilters,
   GoalPagination,
+  UserGoal,
+  UserGoalWithGoal,
   GoalSearchResult,
   GoalStatistics,
   GoalProgress,
   GoalRecommendation,
   GoalAdjustmentSuggestion,
   GoalTemplate,
-  SmartGoalSuggestion,
-  GoalType,
-  GoalTargetMetrics
+  SmartGoalSuggestion
 } from '../models/Goal';
 
 export class GoalService {
-  private goalRepository: GoalRepository;
-
-  constructor() {
-    this.goalRepository = new GoalRepository();
-  }
-
   // =================== Goal Management ===================
 
   async createGoal(goalData: CreateGoalRequest): Promise<Goal> {
-    // Validate goal data
-    this.validateGoalData(goalData);
-    
-    // Create goal
-    const goal = await this.goalRepository.createGoal(goalData);
-    
-    return goal;
-  }
+    const goal = new GoalModel({
+      goal_id: uuidv4(),
+      ...goalData,
+      is_active: true
+    });
 
-  async getGoalById(goalId: string): Promise<Goal | null> {
-    return await this.goalRepository.getGoalById(goalId);
-  }
-
-  async updateGoal(goalId: string, updateData: UpdateGoalRequest): Promise<Goal | null> {
-    // Check if goal exists
-    const existingGoal = await this.goalRepository.getGoalById(goalId);
-    if (!existingGoal) {
-      throw new Error('Goal not found');
-    }
-
-    // Validate update data
-    if (Object.keys(updateData).length > 0) {
-      this.validatePartialGoalData(updateData);
-    }
-
-    return await this.goalRepository.updateGoal(goalId, updateData);
-  }
-
-  async deleteGoal(goalId: string): Promise<boolean> {
-    // Check if goal exists
-    const existingGoal = await this.goalRepository.getGoalById(goalId);
-    if (!existingGoal) {
-      throw new Error('Goal not found');
-    }
-
-    return await this.goalRepository.deleteGoal(goalId);
+    const savedGoal = await goal.save();
+    return this.toGoalInterface(savedGoal);
   }
 
   async getAllGoals(filters?: GoalFilters, pagination?: GoalPagination): Promise<Goal[]> {
-    return await this.goalRepository.getAllGoals(filters, pagination);
+    const query: any = {};
+    
+    if (filters?.goal_type) {
+      query.goal_type = filters.goal_type;
+    }
+    
+    if (filters?.is_active !== undefined) {
+      query.is_active = filters.is_active;
+    }
+    
+    if (filters?.created_after || filters?.created_before) {
+      query.created_at = {};
+      if (filters.created_after) {
+        query.created_at.$gte = filters.created_after;
+      }
+      if (filters.created_before) {
+        query.created_at.$lte = filters.created_before;
+      }
+    }
+
+    let goalQuery = GoalModel.find(query);
+
+    // Apply pagination and sorting
+    if (pagination) {
+      const skip = (pagination.page - 1) * pagination.limit;
+      const sortField = pagination.sort_by || 'created_at';
+      const sortOrder = pagination.sort_order === 'ASC' ? 1 : -1;
+      
+      goalQuery = goalQuery
+        .sort({ [sortField]: sortOrder })
+        .skip(skip)
+        .limit(pagination.limit);
+    }
+
+    const goals = await goalQuery.exec();
+    return goals.map(goal => this.toGoalInterface(goal));
+  }
+
+  async getGoalById(goalId: string): Promise<Goal | null> {
+    const goal = await GoalModel.findOne({ goal_id: goalId });
+    return goal ? this.toGoalInterface(goal) : null;
+  }
+
+  async updateGoal(goalId: string, updateData: UpdateGoalRequest): Promise<Goal | null> {
+    const goal = await GoalModel.findOneAndUpdate(
+      { goal_id: goalId },
+      { ...updateData, updated_at: new Date() },
+      { new: true }
+    );
+    return goal ? this.toGoalInterface(goal) : null;
+  }
+
+  async deleteGoal(goalId: string): Promise<boolean> {
+    const result = await GoalModel.deleteOne({ goal_id: goalId });
+    return result.deletedCount > 0;
   }
 
   async getPopularGoals(limit: number = 10): Promise<Goal[]> {
-    return await this.goalRepository.getGoalsByPopularity(limit);
+    // For now, return most recent active goals
+    // In the future, this could be based on assignment frequency
+    const goals = await GoalModel
+      .find({ is_active: true })
+      .sort({ created_at: -1 })
+      .limit(limit);
+    
+    return goals.map(goal => this.toGoalInterface(goal));
   }
 
   // =================== User Goal Management ===================
 
   async assignGoalToUser(userId: string, assignData: AssignGoalRequest): Promise<UserGoal> {
-    // Validate goal exists
-    const goal = await this.goalRepository.getGoalById(assignData.goal_id);
-    if (!goal) {
+    // Check if goal exists
+    const goalExists = await GoalModel.findOne({ goal_id: assignData.goal_id });
+    if (!goalExists) {
       throw new Error('Goal not found');
     }
 
-    if (!goal.is_active) {
-      throw new Error('Cannot assign inactive goal');
-    }
+    const userGoal = new UserGoalModel({
+      user_goal_id: uuidv4(),
+      user_id: userId,
+      goal_id: assignData.goal_id,
+      target_completion_date: assignData.target_completion_date ? new Date(assignData.target_completion_date) : undefined,
+      notes: assignData.notes,
+      progress_percentage: 0,
+      status: 'Active'
+    });
 
-    // Validate target completion date
-    if (assignData.target_completion_date) {
-      const targetDate = new Date(assignData.target_completion_date);
-      const today = new Date();
-      
-      if (targetDate <= today) {
-        throw new Error('Target completion date must be in the future');
-      }
-    }
-
-    return await this.goalRepository.assignGoalToUser(userId, assignData);
+    const savedUserGoal = await userGoal.save();
+    return this.toUserGoalInterface(savedUserGoal);
   }
 
   async getUserGoals(
-    userId: string,
-    filters?: GoalFilters,
+    userId: string, 
+    filters?: GoalFilters, 
     pagination?: GoalPagination
   ): Promise<GoalSearchResult> {
-    return await this.goalRepository.getUserGoals(userId, filters, pagination);
-  }
-
-  async getUserGoalById(userGoalId: string): Promise<UserGoal | null> {
-    return await this.goalRepository.getUserGoalById(userGoalId);
-  }
-
-  async updateUserGoal(userGoalId: string, updateData: UpdateUserGoalRequest): Promise<UserGoal | null> {
-    // Check if user goal exists
-    const existingUserGoal = await this.goalRepository.getUserGoalById(userGoalId);
-    if (!existingUserGoal) {
-      throw new Error('User goal not found');
+    const query: any = { user_id: userId };
+    
+    if (filters?.status) {
+      query.status = filters.status;
     }
-
-    // Validate progress percentage
-    if (updateData.progress_percentage !== undefined) {
-      if (updateData.progress_percentage < 0 || updateData.progress_percentage > 100) {
-        throw new Error('Progress percentage must be between 0 and 100');
+    
+    if (filters?.progress_min !== undefined || filters?.progress_max !== undefined) {
+      query.progress_percentage = {};
+      if (filters.progress_min !== undefined) {
+        query.progress_percentage.$gte = filters.progress_min;
+      }
+      if (filters.progress_max !== undefined) {
+        query.progress_percentage.$lte = filters.progress_max;
       }
     }
 
-    // Auto-complete goal if progress reaches 100%
-    if (updateData.progress_percentage === 100 && updateData.status !== 'Completed') {
-      updateData.status = 'Completed';
-      updateData.actual_completion_date = new Date().toISOString();
+    const page = pagination?.page || 1;
+    const limit = pagination?.limit || 20;
+    const skip = (page - 1) * limit;
+    const sortField = pagination?.sort_by || 'created_at';
+    const sortOrder = pagination?.sort_order === 'ASC' ? 1 : -1;
+
+    const total = await UserGoalModel.countDocuments(query);
+    const userGoals = await UserGoalModel
+      .find(query)
+      .sort({ [sortField]: sortOrder })
+      .skip(skip)
+      .limit(limit);
+
+    // Populate with goal data
+    const userGoalsWithGoals: UserGoalWithGoal[] = [];
+    for (const userGoal of userGoals) {
+      const goal = await GoalModel.findOne({ goal_id: userGoal.goal_id });
+      if (goal) {
+        userGoalsWithGoals.push({
+          ...this.toUserGoalInterface(userGoal),
+          goal: this.toGoalInterface(goal)
+        });
+      }
     }
 
-    // Validate status transitions
-    if (updateData.status) {
-      this.validateStatusTransition(existingUserGoal.status, updateData.status);
-    }
+    return {
+      goals: userGoalsWithGoals,
+      pagination: {
+        page,
+        limit,
+        total,
+        total_pages: Math.ceil(total / limit)
+      },
+      total_count: total,
+      current_page: page,
+      total_pages: Math.ceil(total / limit),
+      has_next: page < Math.ceil(total / limit),
+      has_previous: page > 1
+    };
+  }
 
-    return await this.goalRepository.updateUserGoal(userGoalId, updateData);
+  async getUserGoalById(userGoalId: string): Promise<UserGoalWithGoal | null> {
+    const userGoal = await UserGoalModel.findOne({ user_goal_id: userGoalId });
+    if (!userGoal) return null;
+
+    const goal = await GoalModel.findOne({ goal_id: userGoal.goal_id });
+    if (!goal) return null;
+
+    return {
+      ...this.toUserGoalInterface(userGoal),
+      goal: this.toGoalInterface(goal)
+    };
+  }
+
+  async updateUserGoal(userGoalId: string, updateData: UpdateUserGoalRequest): Promise<UserGoal | null> {
+    const userGoal = await UserGoalModel.findOneAndUpdate(
+      { user_goal_id: userGoalId },
+      { ...updateData, updated_at: new Date() },
+      { new: true }
+    );
+    return userGoal ? this.toUserGoalInterface(userGoal) : null;
   }
 
   async deleteUserGoal(userGoalId: string): Promise<boolean> {
-    // Check if user goal exists
-    const existingUserGoal = await this.goalRepository.getUserGoalById(userGoalId);
-    if (!existingUserGoal) {
-      throw new Error('User goal not found');
-    }
-
-    return await this.goalRepository.deleteUserGoal(userGoalId);
+    const result = await UserGoalModel.deleteOne({ user_goal_id: userGoalId });
+    return result.deletedCount > 0;
   }
 
   // =================== Progress Tracking ===================
 
   async getGoalProgress(userGoalId: string): Promise<GoalProgress | null> {
-    return await this.goalRepository.calculateGoalProgress(userGoalId);
+    const userGoal = await UserGoalModel.findOne({ user_goal_id: userGoalId });
+    if (!userGoal) return null;
+
+    const goal = await GoalModel.findOne({ goal_id: userGoal.goal_id });
+    if (!goal) return null;
+
+    // Calculate days remaining
+    let daysRemaining: number | undefined;
+    if (userGoal.target_completion_date) {
+      const now = new Date();
+      const targetDate = new Date(userGoal.target_completion_date);
+      daysRemaining = Math.ceil((targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    return {
+      user_goal_id: userGoal.user_goal_id,
+      goal_type: goal.goal_type,
+      target_metrics: {
+        calories: goal.target_calories || undefined,
+        protein: goal.target_protein || undefined,
+        carbs: goal.target_carbs || undefined,
+        fat: goal.target_fat || undefined,
+        weight: goal.target_weight || undefined,
+        duration_weeks: goal.target_duration_weeks || undefined
+      },
+      current_metrics: {
+        // This would be populated from actual user data in a real implementation
+      },
+      progress_percentage: userGoal.progress_percentage,
+      days_remaining: daysRemaining,
+      estimated_completion_date: userGoal.target_completion_date,
+      on_track: userGoal.progress_percentage >= 50 // Simple logic for demo
+    };
   }
 
   async updateGoalProgress(userGoalId: string, progressPercentage: number): Promise<UserGoal | null> {
@@ -163,199 +261,211 @@ export class GoalService {
       throw new Error('Progress percentage must be between 0 and 100');
     }
 
-    const updateData: UpdateUserGoalRequest = {
-      progress_percentage: progressPercentage
+    const updateData: any = {
+      progress_percentage: progressPercentage,
+      updated_at: new Date()
     };
 
-    // Auto-complete if reaches 100%
+    // Auto-complete if progress reaches 100%
     if (progressPercentage >= 100) {
       updateData.status = 'Completed';
-      updateData.actual_completion_date = new Date().toISOString();
+      updateData.actual_completion_date = new Date();
     }
 
-    return await this.updateUserGoal(userGoalId, updateData);
+    const userGoal = await UserGoalModel.findOneAndUpdate(
+      { user_goal_id: userGoalId },
+      updateData,
+      { new: true }
+    );
+
+    return userGoal ? this.toUserGoalInterface(userGoal) : null;
   }
 
   async getUserGoalStatistics(userId: string): Promise<GoalStatistics> {
-    return await this.goalRepository.getUserGoalStatistics(userId);
+    const userGoals = await UserGoalModel.find({ user_id: userId });
+    
+    const total_goals = userGoals.length;
+    const active_goals = userGoals.filter(ug => ug.status === 'Active').length;
+    const completed_goals = userGoals.filter(ug => ug.status === 'Completed').length;
+    const paused_goals = userGoals.filter(ug => ug.status === 'Paused').length;
+    const cancelled_goals = userGoals.filter(ug => ug.status === 'Cancelled').length;
+    
+    const completion_rate = total_goals > 0 ? (completed_goals / total_goals) * 100 : 0;
+    const average_progress = total_goals > 0 
+      ? userGoals.reduce((sum, ug) => sum + ug.progress_percentage, 0) / total_goals 
+      : 0;
+
+    // Get most common goal type
+    const goalTypes: Record<string, number> = {};
+    for (const userGoal of userGoals) {
+      const goal = await GoalModel.findOne({ goal_id: userGoal.goal_id });
+      if (goal) {
+        goalTypes[goal.goal_type] = (goalTypes[goal.goal_type] || 0) + 1;
+      }
+    }
+
+    const most_common_goal_type = Object.keys(goalTypes).reduce((a, b) => 
+      goalTypes[a] > goalTypes[b] ? a : b, 'General Fitness'
+    );
+
+    return {
+      total_goals,
+      active_goals,
+      completed_goals,
+      paused_goals,
+      cancelled_goals,
+      completion_rate,
+      average_progress,
+      most_common_goal_type,
+      goals_by_type: goalTypes,
+      monthly_progress: [] // Would implement proper monthly aggregation
+    };
   }
 
   async getActiveGoalsNearDeadline(userId: string, days: number = 7): Promise<UserGoalWithGoal[]> {
-    return await this.goalRepository.getActiveGoalsNearDeadline(userId, days);
-  }
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() + days);
 
-  async getRecentGoalActivity(userId: string, days: number = 30): Promise<UserGoalWithGoal[]> {
-    return await this.goalRepository.getRecentGoalActivity(userId, days);
-  }
+    const userGoals = await UserGoalModel.find({
+      user_id: userId,
+      status: 'Active',
+      target_completion_date: { $lte: cutoffDate, $gte: new Date() }
+    });
 
-  // =================== Goal Recommendations ===================
-
-  async getGoalRecommendations(userId: string): Promise<GoalRecommendation[]> {
-    // Get user's goal history and statistics
-    const stats = await this.goalRepository.getUserGoalStatistics(userId);
-    const activeGoals = await this.goalRepository.getUserGoals(userId, { status: 'Active' });
-
-    const recommendations: GoalRecommendation[] = [];
-
-    // If user has no active goals, recommend based on popularity and goal types
-    if (activeGoals.goals.length === 0) {
-      recommendations.push(...this.getBeginnerRecommendations());
-    } else {
-      // Recommend complementary goals based on current goals
-      recommendations.push(...this.getComplementaryRecommendations(activeGoals.goals, stats));
-    }
-
-    // Add progressive goals based on completed goals
-    if (stats.completed_goals > 0) {
-      recommendations.push(...this.getProgressiveRecommendations(stats));
-    }
-
-    // Sort by priority and success probability
-    return recommendations
-      .sort((a, b) => {
-        const priorityWeight: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
-        const bPriority = b.priority || 'Low';
-        const aPriority = a.priority || 'Low';
-        const priorityScore = (priorityWeight[bPriority] || 0) - (priorityWeight[aPriority] || 0);
-        if (priorityScore !== 0) return priorityScore;
-        const bProb = b.success_probability || 0;
-        const aProb = a.success_probability || 0;
-        return bProb - aProb;
-      })
-      .slice(0, 5); // Return top 5 recommendations
-  }
-
-  async getGoalAdjustmentSuggestions(userGoalId: string): Promise<GoalAdjustmentSuggestion[]> {
-    const progress = await this.goalRepository.calculateGoalProgress(userGoalId);
-    if (!progress) {
-      throw new Error('Goal progress not found');
-    }
-
-    const suggestions: GoalAdjustmentSuggestion[] = [];
-    const targetMetrics = progress.target_metrics || {};
-
-    // Analyze progress and suggest adjustments
-    if (progress.progress_percentage < 25 && progress.days_remaining && progress.days_remaining > 0) {
-      // Slow progress - suggest easier targets or extended timeline
-      suggestions.push({
-        suggestion_type: 'Decrease',
-        reason: 'Your current progress suggests the targets might be too ambitious. Consider adjusting to more achievable goals.',
-        suggested_metrics: this.calculateEasierTargets(targetMetrics)
-      });
-
-      if (targetMetrics.duration_weeks) {
-        suggestions.push({
-          suggestion_type: 'Modify Timeline',
-          reason: 'Extending the timeline by 30% may help you achieve your goals without compromising quality.',
-          suggested_metrics: { 
-            duration_weeks: Math.ceil(targetMetrics.duration_weeks * 1.3) 
-          }
+    const results: UserGoalWithGoal[] = [];
+    for (const userGoal of userGoals) {
+      const goal = await GoalModel.findOne({ goal_id: userGoal.goal_id });
+      if (goal) {
+        results.push({
+          ...this.toUserGoalInterface(userGoal),
+          goal: this.toGoalInterface(goal)
         });
       }
     }
 
-    if (progress.progress_percentage > 75 && progress.days_remaining && progress.days_remaining > 14) {
-      // Excellent progress - suggest more ambitious targets
+    return results;
+  }
+
+  async getRecentGoalActivity(userId: string, days: number = 30): Promise<UserGoalWithGoal[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const userGoals = await UserGoalModel.find({
+      user_id: userId,
+      updated_at: { $gte: cutoffDate }
+    }).sort({ updated_at: -1 });
+
+    const results: UserGoalWithGoal[] = [];
+    for (const userGoal of userGoals) {
+      const goal = await GoalModel.findOne({ goal_id: userGoal.goal_id });
+      if (goal) {
+        results.push({
+          ...this.toUserGoalInterface(userGoal),
+          goal: this.toGoalInterface(goal)
+        });
+      }
+    }
+
+    return results;
+  }
+
+  // =================== Recommendations & Templates ===================
+
+  async getGoalRecommendations(userId: string): Promise<GoalRecommendation[]> {
+    // Simple recommendation logic - in reality this would be more sophisticated
+    const userGoals = await UserGoalModel.find({ user_id: userId });
+    const existingGoalTypes = new Set();
+    
+    for (const userGoal of userGoals) {
+      const goal = await GoalModel.findOne({ goal_id: userGoal.goal_id });
+      if (goal) {
+        existingGoalTypes.add(goal.goal_type);
+      }
+    }
+
+    const allGoalTypes: GoalType[] = [
+      'Lose Weight', 'Build Muscle', 'Maintain Weight', 
+      'Improve Endurance', 'General Fitness', 'Reduce Fat', 'Increase Endurance'
+    ];
+
+    const recommendations: GoalRecommendation[] = [];
+    
+    for (const goalType of allGoalTypes) {
+      if (!existingGoalTypes.has(goalType)) {
+        recommendations.push({
+          goal_type: goalType,
+          reason: `Based on your current goals, ${goalType.toLowerCase()} would complement your fitness journey`,
+          recommended_metrics: {
+            calories: goalType.includes('Weight') ? 2000 : 2200,
+            protein: 150,
+            duration_weeks: 12
+          },
+          priority: 'Medium',
+          success_probability: 75
+        });
+      }
+    }
+
+    return recommendations.slice(0, 3); // Return top 3 recommendations
+  }
+
+  async getGoalAdjustmentSuggestions(userGoalId: string): Promise<GoalAdjustmentSuggestion[]> {
+    const userGoal = await UserGoalModel.findOne({ user_goal_id: userGoalId });
+    if (!userGoal) {
+      throw new Error('User goal not found');
+    }
+
+    const suggestions: GoalAdjustmentSuggestion[] = [];
+
+    // Check if progress is slow
+    if (userGoal.progress_percentage < 25 && userGoal.created_at < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)) {
       suggestions.push({
-        suggestion_type: 'Increase',
-        reason: 'You\'re ahead of schedule! Consider setting more challenging targets to maximize your progress.',
-        suggested_metrics: this.calculateMoreAmbitiousTargets(targetMetrics)
+        suggestion_type: 'Decrease',
+        reason: 'Progress seems slower than expected. Consider reducing targets to build momentum.',
+        suggested_metrics: { calories: 1800 }
       });
     }
 
-    if (!progress.on_track && progress.days_remaining && progress.days_remaining < 14) {
-      // Behind schedule with little time left - suggest strategy change
-      suggestions.push({
-        suggestion_type: 'Change Strategy',
-        reason: 'With limited time remaining, focus on the most impactful changes and consistency.',
-        suggested_metrics: targetMetrics
-      });
+    // Check if deadline is approaching with low progress
+    if (userGoal.target_completion_date && userGoal.progress_percentage < 50) {
+      const daysLeft = Math.ceil((new Date(userGoal.target_completion_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (daysLeft < 30) {
+        suggestions.push({
+          suggestion_type: 'Modify Timeline',
+          reason: 'With current progress, consider extending the deadline for a more sustainable approach.',
+          suggested_metrics: { duration_weeks: 16 }
+        });
+      }
     }
 
     return suggestions;
   }
 
   async getGoalTemplates(): Promise<GoalTemplate[]> {
-    const templates: GoalTemplate[] = [
+    // Static templates for now - could be stored in database
+    return [
       {
-        template_id: 'template-1',
-        template_name: 'Beginner Fat Loss',
-        goal_type: 'Reduce Fat',
-        default_metrics: {
-          calories: 2000,
-          duration_weeks: 12
-        },
-        description: 'A sustainable fat loss plan for beginners focusing on moderate calorie deficit.',
-        difficulty_level: 'Easy',
-        category: 'Weight Loss',
-        tips: [
-          'Create a moderate calorie deficit of 300-500 calories daily',
-          'Focus on whole foods and reduce processed foods',
-          'Include 3-4 cardio sessions per week',
-          'Stay hydrated with 8-10 glasses of water daily'
-        ]
+        template_id: 'weight_loss_beginner',
+        template_name: 'Beginner Weight Loss',
+        goal_type: 'Lose Weight',
+        default_metrics: { calories: 1800, protein: 120, duration_weeks: 12 },
+        description: 'A gentle introduction to weight loss',
+        difficulty_level: 'Beginner',
+        category: 'Weight Management'
       },
       {
-        template_id: 'template-2',
-        template_name: 'Muscle Building Foundation',
+        template_id: 'muscle_building_intermediate',
+        template_name: 'Muscle Building Program',
         goal_type: 'Build Muscle',
-        default_metrics: {
-          calories: 2500,
-          protein: 140,
-          duration_weeks: 16
-        },
-        description: 'Build lean muscle mass with proper nutrition and progressive training.',
-        difficulty_level: 'Medium',
-        category: 'Fitness',
-        tips: [
-          'Eat in a slight calorie surplus (200-300 calories)',
-          'Consume 1.6-2.2g protein per kg body weight',
-          'Focus on compound movements',
-          'Get adequate sleep for recovery'
-        ]
-      },
-      {
-        template_id: 'template-3',
-        template_name: 'Weight Maintenance',
-        goal_type: 'Maintain Weight',
-        default_metrics: {
-          calories: 2200,
-          duration_weeks: 8
-        },
-        description: 'Maintain current weight while improving body composition.',
-        difficulty_level: 'Easy',
-        category: 'Nutrition',
-        tips: [
-          'Eat at maintenance calories',
-          'Focus on consistent exercise routine',
-          'Monitor weekly weigh-ins',
-          'Prioritize strength training'
-        ]
-      },
-      {
-        template_id: 'template-4',
-        template_name: 'Endurance Builder',
-        goal_type: 'Increase Endurance',
-        default_metrics: {
-          calories: 2400,
-          duration_weeks: 12
-        },
-        description: 'Improve cardiovascular endurance and stamina.',
-        difficulty_level: 'Medium',
-        category: 'Fitness',
-        tips: [
-          'Gradually increase cardio duration',
-          'Include interval training',
-          'Focus on carbohydrate timing',
-          'Monitor heart rate zones'
-        ]
+        default_metrics: { calories: 2400, protein: 180, duration_weeks: 16 },
+        description: 'Structured muscle building approach',
+        difficulty_level: 'Intermediate',
+        category: 'Strength'
       }
     ];
-
-    return templates;
   }
 
-  async createGoalFromTemplate(templateId: string, customizations?: Partial<GoalTargetMetrics>): Promise<CreateGoalRequest> {
+  async createGoalFromTemplate(templateId: string, customizations?: any): Promise<CreateGoalRequest> {
     const templates = await this.getGoalTemplates();
     const template = templates.find(t => t.template_id === templateId);
     
@@ -363,261 +473,79 @@ export class GoalService {
       throw new Error('Template not found');
     }
 
-    const goalData: CreateGoalRequest = {
+    return {
       goal_type: template.goal_type as GoalType,
-      target_calories: customizations?.calories || template.default_metrics.calories,
-      target_protein: customizations?.protein || template.default_metrics.protein,
-      target_carbs: customizations?.carbs || template.default_metrics.carbs,
-      target_fat: customizations?.fat || template.default_metrics.fat,
-      target_weight: customizations?.weight || template.default_metrics.weight,
-      target_duration_weeks: customizations?.duration_weeks || template.default_metrics.duration_weeks,
-      description: template.description
+      description: template.description,
+      target_calories: customizations?.target_calories || template.default_metrics.calories,
+      target_protein: customizations?.target_protein || template.default_metrics.protein,
+      target_carbs: customizations?.target_carbs || template.default_metrics.carbs,
+      target_fat: customizations?.target_fat || template.default_metrics.fat,
+      target_weight: customizations?.target_weight || template.default_metrics.weight,
+      target_duration_weeks: customizations?.target_duration_weeks || template.default_metrics.duration_weeks
     };
-
-    return goalData;
   }
 
   async getSmartGoalSuggestions(userId: string): Promise<SmartGoalSuggestion[]> {
-    const stats = await this.goalRepository.getUserGoalStatistics(userId);
-    const activeGoals = await this.goalRepository.getUserGoals(userId, { status: 'Active' });
-
+    // Simple AI-like suggestions based on user's goal history
+    const userStats = await this.getUserGoalStatistics(userId);
+    
     const suggestions: SmartGoalSuggestion[] = [];
 
-    // Suggest based on goal completion patterns
-    if (stats.completion_rate > 80) {
-      // High completion rate - suggest more challenging goals
+    if (userStats.completion_rate < 50) {
       suggestions.push({
-        suggested_goal_type: 'Build Muscle',
-        reason: 'Your high completion rate suggests you\'re ready for more challenging muscle-building goals.',
-        recommended_metrics: {
-          calories: 2600,
-          protein: 150,
-          duration_weeks: 16
-        },
-        difficulty_level: 'Hard',
+        suggested_goal_type: 'General Fitness',
+        reason: 'Start with broader fitness goals to build sustainable habits',
+        recommended_metrics: { calories: 2000, duration_weeks: 8 },
+        difficulty_level: 'Beginner',
         estimated_success_rate: 85
       });
     }
 
-    if (activeGoals.goals.length === 0) {
-      // No active goals - suggest starter goals
-      suggestions.push({
-        suggested_goal_type: 'General Fitness',
-        reason: 'Start with a balanced approach to establish healthy habits.',
-        recommended_metrics: {
-          calories: 2200,
-          duration_weeks: 8
-        },
-        difficulty_level: 'Easy',
-        estimated_success_rate: 90
-      });
-    }
-
-    // Suggest complementary goals based on most common goal type
-    if (stats.most_common_goal_type === 'Reduce Fat') {
+    if (userStats.most_common_goal_type === 'Lose Weight') {
       suggestions.push({
         suggested_goal_type: 'Build Muscle',
-        reason: 'Combining fat loss with muscle building will improve body composition.',
-        recommended_metrics: {
-          calories: 2400,
-          protein: 130,
-          duration_weeks: 14
-        },
-        difficulty_level: 'Medium',
-        estimated_success_rate: 82
+        reason: 'Adding muscle building can boost metabolism and complement weight loss',
+        recommended_metrics: { calories: 2200, protein: 160, duration_weeks: 12 },
+        difficulty_level: 'Intermediate',
+        estimated_success_rate: 70
       });
     }
 
-    return suggestions.slice(0, 3);
+    return suggestions;
   }
 
-  // =================== Private Helper Methods ===================
+  // =================== Helper Methods ===================
 
-  private validateGoalData(goalData: CreateGoalRequest): void {
-    if (!goalData.goal_type) {
-      throw new Error('Goal type is required');
-    }
-
-    if (goalData.target_calories && goalData.target_calories <= 0) {
-      throw new Error('Target calories must be positive');
-    }
-
-    if (goalData.target_protein && goalData.target_protein < 0) {
-      throw new Error('Target protein cannot be negative');
-    }
-
-    if (goalData.target_carbs && goalData.target_carbs < 0) {
-      throw new Error('Target carbs cannot be negative');
-    }
-
-    if (goalData.target_fat && goalData.target_fat < 0) {
-      throw new Error('Target fat cannot be negative');
-    }
-
-    if (goalData.target_weight && goalData.target_weight <= 0) {
-      throw new Error('Target weight must be positive');
-    }
-
-    if (goalData.target_duration_weeks && goalData.target_duration_weeks <= 0) {
-      throw new Error('Target duration must be positive');
-    }
-  }
-
-  private validatePartialGoalData(updateData: UpdateGoalRequest): void {
-    if (updateData.target_calories !== undefined && updateData.target_calories <= 0) {
-      throw new Error('Target calories must be positive');
-    }
-
-    if (updateData.target_protein !== undefined && updateData.target_protein < 0) {
-      throw new Error('Target protein cannot be negative');
-    }
-
-    if (updateData.target_carbs !== undefined && updateData.target_carbs < 0) {
-      throw new Error('Target carbs cannot be negative');
-    }
-
-    if (updateData.target_fat !== undefined && updateData.target_fat < 0) {
-      throw new Error('Target fat cannot be negative');
-    }
-
-    if (updateData.target_weight !== undefined && updateData.target_weight <= 0) {
-      throw new Error('Target weight must be positive');
-    }
-
-    if (updateData.target_duration_weeks !== undefined && updateData.target_duration_weeks <= 0) {
-      throw new Error('Target duration must be positive');
-    }
-  }
-
-  private validateStatusTransition(currentStatus: string, newStatus: string): void {
-    const validTransitions: Record<string, string[]> = {
-      'Active': ['Paused', 'Completed', 'Cancelled'],
-      'Paused': ['Active', 'Cancelled'],
-      'Completed': [], // Completed goals cannot be changed
-      'Cancelled': ['Active'] // Can reactivate cancelled goals
+  private toGoalInterface(goal: IGoal): Goal {
+    return {
+      goal_id: goal.goal_id,
+      goal_type: goal.goal_type,
+      description: goal.description || null,
+      target_calories: goal.target_calories || null,
+      target_protein: goal.target_protein || null,
+      target_carbs: goal.target_carbs || null,
+      target_fat: goal.target_fat || null,
+      target_weight: goal.target_weight || null,
+      target_duration_weeks: goal.target_duration_weeks || null,
+      is_active: goal.is_active,
+      created_at: goal.created_at.toISOString(),
+      updated_at: goal.updated_at.toISOString()
     };
-
-    if (!validTransitions[currentStatus]?.includes(newStatus)) {
-      throw new Error(`Invalid status transition from ${currentStatus} to ${newStatus}`);
-    }
   }
 
-  private getBeginnerRecommendations(): GoalRecommendation[] {
-    return [
-      {
-        goal_type: 'General Fitness',
-        reason: 'Perfect starting point to establish healthy habits and build consistency.',
-        recommended_metrics: {
-          calories: 2200,
-          duration_weeks: 8
-        },
-        priority: 'High',
-        success_probability: 90
-      },
-      {
-        goal_type: 'Maintain Weight',
-        reason: 'Learn portion control and develop awareness of your eating patterns.',
-        recommended_metrics: {
-          calories: 2100,
-          duration_weeks: 6
-        },
-        priority: 'Medium',
-        success_probability: 85
-      }
-    ];
-  }
-
-  private getComplementaryRecommendations(activeGoals: UserGoalWithGoal[], stats: GoalStatistics): GoalRecommendation[] {
-    const recommendations: GoalRecommendation[] = [];
-    const activeGoalTypes = activeGoals
-      .filter(g => g.goal !== undefined)
-      .map(g => g.goal!.goal_type);
-
-    // If user has fat loss goal, suggest muscle building
-    if (activeGoalTypes.includes('Reduce Fat') && !activeGoalTypes.includes('Build Muscle')) {
-      recommendations.push({
-        goal_type: 'Build Muscle',
-        reason: 'Adding muscle building to your fat loss goals will improve body composition.',
-        recommended_metrics: {
-          calories: 2400,
-          protein: 130,
-          duration_weeks: 12
-        },
-        priority: 'High',
-        success_probability: 75
-      });
-    }
-
-    // If user has muscle building, suggest endurance
-    if (activeGoalTypes.includes('Build Muscle') && !activeGoalTypes.includes('Increase Endurance')) {
-      recommendations.push({
-        goal_type: 'Increase Endurance',
-        reason: 'Improve cardiovascular health while maintaining muscle gains.',
-        recommended_metrics: {
-          calories: 2500,
-          duration_weeks: 10
-        },
-        priority: 'Medium',
-        success_probability: 70
-      });
-    }
-
-    return recommendations;
-  }
-
-  private getProgressiveRecommendations(stats: GoalStatistics): GoalRecommendation[] {
-    const recommendations: GoalRecommendation[] = [];
-
-    if (stats.most_common_goal_type === 'General Fitness' && stats.completed_goals >= 2) {
-      recommendations.push({
-        goal_type: 'Build Muscle',
-        reason: 'You\'ve mastered the basics. Time to focus on building lean muscle mass.',
-        recommended_metrics: {
-          calories: 2500,
-          protein: 140,
-          duration_weeks: 14
-        },
-        priority: 'High',
-        success_probability: 80
-      });
-    }
-
-    return recommendations;
-  }
-
-  private calculateEasierTargets(currentTargets: GoalTargetMetrics): Partial<GoalTargetMetrics> {
-    const easierTargets: Partial<GoalTargetMetrics> = {};
-
-    if (currentTargets.calories) {
-      easierTargets.calories = Math.floor(currentTargets.calories * 1.1); // 10% easier
-    }
-
-    if (currentTargets.protein) {
-      easierTargets.protein = Math.floor(currentTargets.protein * 0.9); // 10% less protein
-    }
-
-    if (currentTargets.weight) {
-      easierTargets.weight = currentTargets.weight + 1; // 1kg less ambitious
-    }
-
-    return easierTargets;
-  }
-
-  private calculateMoreAmbitiousTargets(currentTargets: GoalTargetMetrics): Partial<GoalTargetMetrics> {
-    const ambitiousTargets: Partial<GoalTargetMetrics> = {};
-
-    if (currentTargets.calories) {
-      ambitiousTargets.calories = Math.floor(currentTargets.calories * 0.95); // 5% more deficit/surplus
-    }
-
-    if (currentTargets.protein) {
-      ambitiousTargets.protein = Math.floor(currentTargets.protein * 1.1); // 10% more protein
-    }
-
-    if (currentTargets.weight) {
-      ambitiousTargets.weight = currentTargets.weight - 1; // 1kg more ambitious
-    }
-
-    return ambitiousTargets;
+  private toUserGoalInterface(userGoal: IUserGoal): UserGoal {
+    return {
+      user_goal_id: userGoal.user_goal_id,
+      user_id: userGoal.user_id,
+      goal_id: userGoal.goal_id,
+      assigned_date: userGoal.assigned_date.toISOString(),
+      target_completion_date: userGoal.target_completion_date?.toISOString() || null,
+      actual_completion_date: userGoal.actual_completion_date?.toISOString() || null,
+      progress_percentage: userGoal.progress_percentage,
+      status: userGoal.status,
+      notes: userGoal.notes || null,
+      created_at: userGoal.created_at.toISOString(),
+      updated_at: userGoal.updated_at.toISOString()
+    };
   }
 }

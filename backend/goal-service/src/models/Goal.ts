@@ -1,4 +1,4 @@
-// backend/goal-service/src/models/Goal.ts
+import mongoose, { Schema, Document } from 'mongoose';
 
 // Loại goal
 export type GoalType =
@@ -10,7 +10,86 @@ export type GoalType =
   | 'Reduce Fat'
   | 'Increase Endurance';
 
-// Bản ghi goal trong DB
+// Mongoose document interfaces
+export interface IGoal extends Document {
+  goal_id: string;
+  goal_type: GoalType;
+  description?: string;
+  target_calories?: number;
+  target_protein?: number;
+  target_carbs?: number;
+  target_fat?: number;
+  target_weight?: number;
+  target_duration_weeks?: number;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface IUserGoal extends Document {
+  user_goal_id: string;
+  user_id: string;
+  goal_id: string;
+  assigned_date: Date;
+  target_completion_date?: Date;
+  actual_completion_date?: Date;
+  progress_percentage: number;
+  status: string;
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Mongoose schemas
+const goalSchema = new Schema<IGoal>({
+  goal_id: { type: String, required: true, unique: true },
+  goal_type: { 
+    type: String, 
+    required: true,
+    enum: ['Lose Weight', 'Build Muscle', 'Maintain Weight', 'Improve Endurance', 'General Fitness', 'Reduce Fat', 'Increase Endurance']
+  },
+  description: { type: String },
+  target_calories: { type: Number },
+  target_protein: { type: Number },
+  target_carbs: { type: Number },
+  target_fat: { type: Number },
+  target_weight: { type: Number },
+  target_duration_weeks: { type: Number },
+  is_active: { type: Boolean, default: true },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
+});
+
+const userGoalSchema = new Schema<IUserGoal>({
+  user_goal_id: { type: String, required: true, unique: true },
+  user_id: { type: String, required: true },
+  goal_id: { type: String, required: true },
+  assigned_date: { type: Date, default: Date.now },
+  target_completion_date: { type: Date },
+  actual_completion_date: { type: Date },
+  progress_percentage: { type: Number, default: 0, min: 0, max: 100 },
+  status: { type: String, default: 'Active', enum: ['Active', 'Paused', 'Completed', 'Cancelled'] },
+  notes: { type: String },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
+});
+
+// Update timestamps before save
+goalSchema.pre('save', function(this: IGoal, next: () => void) {
+  this.updated_at = new Date();
+  next();
+});
+
+userGoalSchema.pre('save', function(this: IUserGoal, next: () => void) {
+  this.updated_at = new Date();
+  next();
+});
+
+// Create models
+export const GoalModel = mongoose.model<IGoal>('Goal', goalSchema);
+export const UserGoalModel = mongoose.model<IUserGoal>('UserGoal', userGoalSchema);
+
+// Original interfaces for API compatibility
 export interface Goal {
   goal_id: string;
   goal_type: GoalType;
