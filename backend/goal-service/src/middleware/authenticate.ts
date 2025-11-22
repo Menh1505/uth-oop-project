@@ -3,12 +3,14 @@ import jwt from 'jsonwebtoken';
 import { jwtConfig } from '../config/jwt';
 
 export interface JwtClaims {
-  user_id: string;
+  id: string;           // user_id được map thành id trong JWT
   email: string;
+  role: string;
   iat?: number;
   exp?: number;
   iss?: string;
   aud?: string;
+  jti?: string;
 }
 
 export interface AuthRequest extends Request {

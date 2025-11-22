@@ -1,11 +1,12 @@
 export interface JwtClaims {
   id: string;
   email: string;
-  role?: string;
+  role: string;
   iat?: number;
   exp?: number;
   iss?: string;
   aud?: string;
+  jti?: string;
 }
 // Food interface
 export interface Food {
