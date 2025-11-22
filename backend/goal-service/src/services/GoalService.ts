@@ -364,7 +364,7 @@ export class GoalService {
     }
 
     const goalData: CreateGoalRequest = {
-      goal_type: template.goal_type,
+      goal_type: template.goal_type as GoalType,
       target_calories: customizations?.calories || template.default_metrics.calories,
       target_protein: customizations?.protein || template.default_metrics.protein,
       target_carbs: customizations?.carbs || template.default_metrics.carbs,

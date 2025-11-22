@@ -1,6 +1,9 @@
+version: "3.8"
+
 services:
+
   # ==========================
-  # PostgreSQL (multi-database)
+  # PostgreSQL
   # ==========================
   postgres:
     image: postgres:15-alpine
@@ -21,6 +24,7 @@ services:
       timeout: 5s
       retries: 5
 
+
   # ==========================
   # Redis
   # ==========================
@@ -32,7 +36,7 @@ services:
       - redis_data:/data
     networks:
       - backend
-    command: redis-server --appendonly yes
+
 
   # ==========================
   # RabbitMQ
@@ -50,6 +54,7 @@ services:
     networks:
       - backend
 
+
   # ==========================
   # NGINX Gateway
   # ==========================
@@ -61,15 +66,24 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - postgres
+      - redis
       - rabbitmq
+      - auth-service
+      - user-service
+      - meal-service
+      - exercise-service
+      - goal-service
+      - recommendation-service
+      - payment-service
+      - admin-service
     networks:
       - backend
     restart: unless-stopped
 
-  # ==========================
-  # Microservices (internal only)
-  # ==========================
 
+  # ==========================
+  # AUTH SERVICE
+  # ==========================
   auth-service:
     build: ./auth-service
     expose:
@@ -80,15 +94,15 @@ services:
       DB_USER: postgres
       DB_PASSWORD: uth
       DB_NAME: fitfood_auth_db
-      NODE_ENV: development
       PORT: 3001
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       JWT_SECRET: shared-secret
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
     depends_on:
       - postgres
       - rabbitmq
     networks:
       - backend
+
 
   user-service:
     build: ./user-service
@@ -100,15 +114,15 @@ services:
       DB_USER: postgres
       DB_PASSWORD: uth
       DB_NAME: fitfood_user_db
-      NODE_ENV: development
       PORT: 3002
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       JWT_SECRET: shared-secret
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
     depends_on:
       - postgres
       - rabbitmq
     networks:
       - backend
+
 
   meal-service:
     build: ./meal-service
@@ -120,15 +134,15 @@ services:
       DB_USER: postgres
       DB_PASSWORD: uth
       DB_NAME: fitfood_meal_db
-      NODE_ENV: development
       PORT: 3004
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       JWT_SECRET: shared-secret
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
     depends_on:
       - postgres
       - rabbitmq
     networks:
       - backend
+
 
   exercise-service:
     build: ./exercise-service
@@ -140,15 +154,14 @@ services:
       DB_USER: postgres
       DB_PASSWORD: uth
       DB_NAME: fitfood_exercise_db
-      NODE_ENV: development
       PORT: 3005
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       JWT_SECRET: shared-secret
     depends_on:
       - postgres
       - rabbitmq
     networks:
       - backend
+
 
   goal-service:
     build: ./goal-service
@@ -160,15 +173,13 @@ services:
       DB_USER: postgres
       DB_PASSWORD: uth
       DB_NAME: fitfood_goal_db
-      NODE_ENV: development
       PORT: 3006
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       JWT_SECRET: shared-secret
     depends_on:
       - postgres
-      - rabbitmq
     networks:
       - backend
+
 
   recommendation-service:
     build: ./recommendation-service
@@ -180,15 +191,13 @@ services:
       DB_USER: postgres
       DB_PASSWORD: uth
       DB_NAME: fitfood_reco_db
-      NODE_ENV: development
       PORT: 3007
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      PAYMENT_SERVICE_URL: http://payment-service:3008
       JWT_SECRET: shared-secret
     depends_on:
       - postgres
     networks:
       - backend
+
 
   payment-service:
     build: ./payment-service
@@ -200,7 +209,6 @@ services:
       DB_USER: postgres
       DB_PASSWORD: uth
       DB_NAME: fitfood_payment_db
-      NODE_ENV: development
       PORT: 3008
       JWT_SECRET: shared-secret
     depends_on:
@@ -208,6 +216,7 @@ services:
       - rabbitmq
     networks:
       - backend
+
 
   admin-service:
     build: ./admin-service
@@ -219,7 +228,6 @@ services:
       DB_USER: postgres
       DB_PASSWORD: uth
       DB_NAME: fitfood_admin_db
-      NODE_ENV: development
       PORT: 3003
       JWT_SECRET: shared-secret
       USER_SERVICE_URL: http://user-service:3002
@@ -229,35 +237,11 @@ services:
     networks:
       - backend
 
-  # ==========================
-  # Observability Stack
-  # ==========================
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    networks:
-      - backend
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3001:3000"
-    networks:
-      - backend
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    ports:
-      - "16686:16686"
-    networks:
-      - backend
 
 networks:
   backend:
     driver: bridge
+
 
 volumes:
   postgres_data:

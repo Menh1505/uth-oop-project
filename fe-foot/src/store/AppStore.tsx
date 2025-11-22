@@ -25,6 +25,7 @@ export type Store = {
   // journal
   meals: MealLog[];
   workouts: WorkoutLog[];
+  fetchMeals(): Promise<void>;
   addMeal(m: Omit<MealLog, "id" | "time"> & { time?: string }): void;
   addWorkout(w: Omit<WorkoutLog, "id" | "time"> & { time?: string }): void;
 
@@ -74,19 +75,69 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const response = await fetch('/api/auth/verify', {
+        // 1) Verify access token
+        const verifyRes = await fetch('/api/auth/verify', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
-        if (response.ok) {
-          const data = await response.json();
-          // Backend currently returns { valid, claims: { id, email, role } }
-          const claims = (data as any).user || (data as any).claims;
-          if (!claims) {
-            throw new Error('Missing auth claims');
+
+        if (!verifyRes.ok) {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('accessToken');
+          setLoading(false);
+          return;
+        }
+
+        const verifyData = await verifyRes.json();
+        const claims = (verifyData as any).user || (verifyData as any).claims;
+        if (!claims) {
+          throw new Error('Missing auth claims');
+        }
+
+        setAuthed(true);
+
+        // 2) Lấy hồ sơ chi tiết từ /api/users/me để quyết định needsOnboarding
+        try {
+          const meRes = await fetch('/api/users/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (meRes.ok) {
+            const profileData = await meRes.json();
+            setProfile({
+              name: profileData.user?.name || claims.email || 'User',
+              goal: 'maintain',
+              diet: 'balanced',
+              budgetPerMeal: 50000,
+              timePerWorkout: 60,
+              username: profileData.user?.username || claims.email,
+              role: (profileData.user?.role || claims.role || 'user')
+                .toString()
+                .toLowerCase() === 'admin'
+                ? 'admin'
+                : 'user',
+              // Backend dự kiến trả về needsOnboarding; nếu không có thì fallback false
+              needsOnboarding: profileData.needsOnboarding === true,
+            });
+          } else {
+            // Nếu /me lỗi (ví dụ chưa có hồ sơ) -> yêu cầu onboarding
+            setProfile({
+              name: claims.email,
+              goal: 'maintain',
+              diet: 'balanced',
+              budgetPerMeal: 50000,
+              timePerWorkout: 60,
+              username: claims.email,
+              role: claims.role === 'admin' ? 'admin' : 'user',
+              needsOnboarding: claims.role !== 'admin',
+            });
           }
-          setAuthed(true);
+        } catch (profileErr) {
+          console.error('Auth hydrate /users/me error:', profileErr);
+          // Nếu không gọi được /me vẫn cho đăng nhập, nhưng bắt đi onboarding lại
           setProfile({
             name: claims.email,
             goal: 'maintain',
@@ -95,11 +146,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
             timePerWorkout: 60,
             username: claims.email,
             role: claims.role === 'admin' ? 'admin' : 'user',
-            needsOnboarding: claims.role !== 'admin'
+            needsOnboarding: claims.role !== 'admin',
           });
-        } else {
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('accessToken');
         }
       } catch (error) {
         console.error('Auth check error:', error);
@@ -350,8 +398,70 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addMeal: Store["addMeal"] = (partial) =>
+  const fetchMeals: Store["fetchMeals"] = async () => {
+    const token = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/meals/', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Expect { success, meals: [...]} from backend controller
+      const items = (data.meals || []) as any[];
+      const mapped: MealLog[] = items.map((m: any) => ({
+        id: m.meal_id || uid('meal'),
+        name: m.meal_name || m.meal_type || 'Meal',
+        calories: Math.round(m.total_calories || 0),
+        protein: Math.round(m.total_protein || 0),
+        carbs: Math.round(m.total_carbs || 0),
+        fat: Math.round(m.total_fat || 0),
+        time: (m.meal_date ? `${m.meal_date}T${(m.meal_time||'00:00')}:00` : nowISO())
+      }));
+      setMeals(mapped);
+    } catch (e) {
+      console.warn('fetchMeals failed, keep local state', e);
+    }
+  };
+
+  const addMeal: Store["addMeal"] = async (partial) => {
+    const token = localStorage.getItem('authToken') || localStorage.getItem('accessToken');
+    // Default fields for backend payload
+    const now = new Date();
+    const y = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const HH = String(now.getHours()).padStart(2, '0');
+    const MI = String(now.getMinutes()).padStart(2, '0');
+    const payload = {
+      meal_type: 'Snack',
+      meal_date: `${y}-${mm}-${dd}`,
+      meal_time: `${HH}:${MI}`,
+      meal_name: partial.name || 'Meal',
+      notes: ''
+    };
+
+    if (token) {
+      try {
+        const res = await fetch('/api/meals/', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          await fetchMeals();
+          return;
+        }
+      } catch (e) {
+        console.warn('addMeal API failed, fallback to local add', e);
+      }
+    }
+    // Fallback local append
     setMeals((prev) => [{ id: uid("meal"), time: partial.time ?? nowISO(), ...partial }, ...prev]);
+  };
 
   const addWorkout: Store["addWorkout"] = (partial) =>
     setWorkouts((prev) => [{ id: uid("workout"), time: partial.time ?? nowISO(), ...partial }, ...prev]);
@@ -408,7 +518,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   const value: Store = {
     authed, loading, profile, signIn, signOut, completeOnboarding, updateProfile, login, adminLogin, loginError, loginLoading, register, registerError, registerLoading, registerSuccess,
-    meals, workouts, addMeal, addWorkout,
+    meals, workouts, fetchMeals, addMeal, addWorkout,
     cart, addToCart, changeQty, cartTotal, clearCart,
     order, startCheckout, cancelOrder,
   };

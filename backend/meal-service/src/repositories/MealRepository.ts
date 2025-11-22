@@ -1,4 +1,4 @@
-import { Pool } from '../../node_modules/@types/pg';
+import { Pool } from 'pg';
 import { 
   Meal, 
   MealFood, 
@@ -15,6 +15,18 @@ import pool from '../config/database';
 
 export class MealRepository {
   private static pool: Pool = pool;
+
+  // List recent meals for a user
+  static async getUserMeals(userId: string, limit = 100): Promise<Meal[]> {
+    const query = `
+      SELECT * FROM meals 
+      WHERE user_id = $1 
+      ORDER BY meal_date DESC, meal_time DESC, created_at DESC
+      LIMIT $2
+    `;
+    const result = await this.pool.query(query, [userId, limit]);
+    return result.rows;
+  }
 
   // Create new meal
   static async create(userId: string, mealData: CreateMealPayload): Promise<Meal> {

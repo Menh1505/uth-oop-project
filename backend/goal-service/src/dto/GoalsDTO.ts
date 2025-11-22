@@ -1,4 +1,4 @@
-
+import type { GoalType } from '../models/Goal';
 export interface CreateGoalRequest {
   goal_type: GoalType;
   description?: string;

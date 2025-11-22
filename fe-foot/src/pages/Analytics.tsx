@@ -27,8 +27,27 @@ export default function Analytics() {
     try {
       setLoading(true);
       setError("");
-      const data = await ApiClient.get<DailyAnalysis[]>("/nutrition/analysis/daily");
-      setAnalysis(data || []);
+
+      // Backend provides: GET /nutrition/daily/:date -> { success, nutrition }
+      const today = new Date().toISOString().slice(0, 10);
+      const res: any = await ApiClient.get("/nutrition/daily/" + today);
+      const n = res?.nutrition || res;
+
+      if (n) {
+        const rows: DailyAnalysis[] = [
+          {
+            date: today,
+            caloriesIn: Math.round(n.total_calories || 0),
+            caloriesOut: 0,
+            protein: Math.round(n.total_protein || 0),
+            carbs: Math.round(n.total_carbs || 0),
+            fat: Math.round(n.total_fat || 0),
+          },
+        ];
+        setAnalysis(rows);
+      } else {
+        setAnalysis([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi tải dữ liệu");
       // Fallback to local calculation

@@ -57,6 +57,55 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "fitfood_meal_db" <
   );
   CREATE INDEX IF NOT EXISTS idx_meals_user_id ON meals(user_id);
   CREATE INDEX IF NOT EXISTS idx_meals_meal_date ON meals(meal_date);
+
+  CREATE TABLE IF NOT EXISTS foods (
+      food_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      food_name VARCHAR(255) NOT NULL,
+      category VARCHAR(100),
+      serving_size DECIMAL(8,2),
+      serving_unit VARCHAR(50),
+      calories DECIMAL(8,2),
+      protein DECIMAL(6,2),
+      carbs DECIMAL(6,2),
+      fat DECIMAL(6,2),
+      fiber DECIMAL(6,2),
+      sugar DECIMAL(6,2),
+      sodium DECIMAL(8,2),
+      cholesterol DECIMAL(8,2),
+      vitamin_a DECIMAL(8,2),
+      vitamin_c DECIMAL(8,2),
+      calcium DECIMAL(8,2),
+      iron DECIMAL(8,2),
+      barcode VARCHAR(50),
+      brand VARCHAR(255),
+      allergens TEXT,
+      is_vegetarian BOOLEAN DEFAULT false,
+      is_vegan BOOLEAN DEFAULT false,
+      is_gluten_free BOOLEAN DEFAULT false,
+      image_url TEXT,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_foods_category ON foods(category);
+  CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode);
+
+  CREATE TABLE IF NOT EXISTS meal_foods (
+      meal_food_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      meal_id UUID NOT NULL REFERENCES meals(meal_id) ON DELETE CASCADE,
+      food_id UUID NOT NULL REFERENCES foods(food_id) ON DELETE CASCADE,
+      quantity DECIMAL(8,2) NOT NULL,
+      unit VARCHAR(50) NOT NULL,
+      calories_consumed DECIMAL(8,2),
+      protein_consumed DECIMAL(6,2),
+      carbs_consumed DECIMAL(6,2),
+      fat_consumed DECIMAL(6,2),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_meal_foods_meal_id ON meal_foods(meal_id);
+  CREATE INDEX IF NOT EXISTS idx_meal_foods_food_id ON meal_foods(food_id);
 EOF
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "fitfood_exercise_db" <<EOF

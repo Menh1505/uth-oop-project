@@ -254,21 +254,13 @@ export default function ProfileModal({
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="grid grid-cols-1 gap-3 pt-2">
                   <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-3 py-2.5">
                     <div className="text-[11px] font-medium tracking-wide text-slate-200 uppercase">
                       Mục tiêu
                     </div>
                     <div className="mt-1 text-sm font-semibold text-sky-200 capitalize">
                       {profile.goal}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
-                    <div className="text-[11px] font-medium tracking-wide text-slate-200 uppercase">
-                      Chế độ ăn
-                    </div>
-                    <div className="mt-1 text-sm font-semibold text-emerald-200 capitalize">
-                      {profile.diet}
                     </div>
                   </div>
                 </div>

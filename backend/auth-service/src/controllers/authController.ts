@@ -49,6 +49,34 @@ export class AuthController {
     res.json({ access_token: result.access_token, expires_at: result.expires_at, refresh_token: result.refresh_token, token_type: 'Bearer' });
   }
 
+	static async googleLogin(req: Request, res: Response) {
+		try {
+			const idToken = (req.body?.idToken as string) || (req.body?.id_token as string);
+			if (!idToken) {
+				return res.status(400).json({ message: 'idToken is required' });
+			}
+
+			const result = await AuthService.loginWithGoogle(idToken);
+
+			res.cookie('refresh_token', result.refresh_token, {
+				httpOnly: true,
+				secure: !!process.env.COOKIE_SECURE,
+				sameSite: 'lax',
+				maxAge: parseInt(process.env.REFRESH_TTL_SEC || `${60 * 60 * 24 * 30}`, 10) * 1000,
+				path: '/auth',
+			});
+			res.json({
+				access_token: result.access_token,
+				expires_at: result.expires_at,
+				refresh_token: result.refresh_token,
+				token_type: 'Bearer',
+			});
+		} catch (e: any) {
+			console.error('Google login error:', e);
+			res.status(401).json({ message: e.message || 'Google login failed' });
+		}
+	}
+
   static async adminLogin(req: Request, res: Response) {
     const { username, password } = req.body || {};
     if (!username || !password) return res.status(400).json({ message: 'Username and password required' });

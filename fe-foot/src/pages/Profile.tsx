@@ -20,6 +20,17 @@ interface UserData {
   last_login?: string;
 }
 
+interface UserGoalSummary {
+  user_goal_id: string;
+  goal_type: string;
+  description?: string | null;
+  target_calories?: number | null;
+  target_weight?: number | null;
+  target_duration_weeks?: number | null;
+  progress_percentage: number;
+  status: string;
+}
+
 export default function ProfilePage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -28,6 +39,10 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<UserData>>({});
+
+  const [userGoal, setUserGoal] = useState<UserGoalSummary | null>(null);
+  const [goalLoading, setGoalLoading] = useState(false);
+  const [goalError, setGoalError] = useState<string | null>(null);
 
   // Fetch user data on mount
   useEffect(() => {
@@ -39,6 +54,7 @@ export default function ProfilePage() {
           setUserData(data.user);
           setEditForm(data.user);
         }
+        await fetchUserGoal();
       } catch (err) {
         console.error("Failed to fetch user data:", err);
         setError("Không thể tải thông tin hồ sơ");
@@ -49,6 +65,101 @@ export default function ProfilePage() {
 
     fetchUserData();
   }, []);
+
+  const fetchUserGoal = async () => {
+    try {
+      setGoalLoading(true);
+      setGoalError(null);
+      const res: any = await ApiClient.get("/goals/user-goals?limit=1&status=Active");
+      const payload = res?.data || res;
+      const first = payload?.goals?.[0];
+      if (first && first.goal) {
+        setUserGoal({
+          user_goal_id: first.user_goal_id,
+          goal_type: first.goal.goal_type || "Goal",
+          description: first.goal.description || null,
+          target_calories: first.goal.target_calories ?? null,
+          target_weight: first.goal.target_weight ?? null,
+          target_duration_weeks: first.goal.target_duration_weeks ?? null,
+          progress_percentage: first.progress_percentage ?? 0,
+          status: first.status || "Active",
+        });
+      } else {
+        setUserGoal(null);
+      }
+    } catch (e: any) {
+      console.error("Failed to fetch user goals:", e);
+      setGoalError(e?.message || "Không thể tải mục tiêu");
+    } finally {
+      setGoalLoading(false);
+    }
+  };
+
+  const handleAddGoal = async () => {
+    try {
+      const goalType = window.prompt("Nhập loại mục tiêu (vd: Reduce Fat, Build Muscle)", "Reduce Fat");
+      if (!goalType) return;
+      const targetWeightStr = window.prompt("Nhập cân nặng mục tiêu (kg)", "65");
+      const targetWeight = targetWeightStr ? parseFloat(targetWeightStr) : undefined;
+
+      const createPayload: any = {
+        goal_type: goalType,
+        description: "Mục tiêu cá nhân từ Profile",
+        target_weight: targetWeight,
+        target_duration_weeks: 8,
+      };
+
+      const created: any = await ApiClient.post("/goals", createPayload);
+      const createdGoal = created?.data || created;
+      const goalId = createdGoal?.goal_id || createdGoal?.id;
+      if (!goalId) {
+        alert("Không tạo được goal mới");
+        return;
+      }
+
+      const assignPayload = {
+        goal_id: goalId,
+        notes: "Mục tiêu được tạo từ trang hồ sơ",
+      };
+      await ApiClient.post("/goals/user-goals", assignPayload);
+      await fetchUserGoal();
+    } catch (e: any) {
+      console.error("Add goal error:", e);
+      alert(e?.message || "Không thể thêm mục tiêu");
+    }
+  };
+
+  const handleUpdateGoal = async () => {
+    if (!userGoal) return;
+    try {
+      const progressStr = window.prompt(
+        "Nhập tiến độ mới (%) cho mục tiêu hiện tại",
+        String(userGoal.progress_percentage || 0)
+      );
+      if (!progressStr) return;
+      const progress = parseFloat(progressStr);
+      if (Number.isNaN(progress)) return;
+      await ApiClient.put(`/goals/user-goals/${userGoal.user_goal_id}`, {
+        progress_percentage: progress,
+      });
+      await fetchUserGoal();
+    } catch (e: any) {
+      console.error("Update goal error:", e);
+      alert(e?.message || "Không thể cập nhật mục tiêu");
+    }
+  };
+
+  const handleDeleteGoal = async () => {
+    if (!userGoal) return;
+    if (!window.confirm("Bạn chắc chắn muốn xóa mục tiêu này?")) return;
+    try {
+      await ApiClient.delete(`/goals/user-goals/${userGoal.user_goal_id}`);
+      setUserGoal(null);
+    } catch (e: any) {
+      console.error("Delete goal error:", e);
+      alert(e?.message || "Không thể xóa mục tiêu");
+    }
+  };
 
   const handleEditChange = (field: keyof UserData, value: any) => {
     setEditForm((prev) => ({
@@ -358,6 +469,90 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Goals section under personal info */}
+          <div className="py-6 border-t border-slate-800/70 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">
+                Mục tiêu cá nhân
+              </h3>
+              <div className="h-px flex-1 bg-gradient-to-r from-slate-700 via-slate-800 to-transparent" />
+            </div>
+
+            {goalLoading ? (
+              <div className="text-sm text-slate-400">Đang tải mục tiêu...</div>
+            ) : (
+              <>
+                {goalError && (
+                  <div className="text-xs text-yellow-400">{goalError}</div>
+                )}
+
+                {userGoal ? (
+                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-4 space-y-1">
+                    <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">
+                      {userGoal.goal_type}
+                    </div>
+                    {userGoal.description && (
+                      <div className="text-sm text-slate-100">
+                        {userGoal.description}
+                      </div>
+                    )}
+                    <div className="text-xs text-slate-400">
+                      Tiến độ:{" "}
+                      <span className="text-emerald-300 font-semibold">
+                        {Math.round(userGoal.progress_percentage)}%
+                      </span>
+                      {userGoal.target_weight && (
+                        <span className="ml-2">
+                          · Cân nặng mục tiêu: {userGoal.target_weight} kg
+                        </span>
+                      )}
+                      {userGoal.target_duration_weeks && (
+                        <span className="ml-2">
+                          · Thời gian: {userGoal.target_duration_weeks} tuần
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Trạng thái: {userGoal.status}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-400">
+                    Bạn chưa có mục tiêu nào. Hãy thêm một mục tiêu để FitFood
+                    theo dõi cho bạn.
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                  <Button
+                    onClick={handleAddGoal}
+                    className="flex-1 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-medium"
+                  >
+                    Thêm mục tiêu
+                  </Button>
+                  {userGoal && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        onClick={handleUpdateGoal}
+                        className="flex-1 h-10 rounded-xl text-sm font-medium"
+                      >
+                        Sửa mục tiêu
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteGoal}
+                        className="flex-1 h-10 rounded-xl text-sm font-medium"
+                      >
+                        Xóa mục tiêu
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </>
             )}
           </div>
 

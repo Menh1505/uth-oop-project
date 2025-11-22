@@ -111,8 +111,20 @@ export class UserService {
       return true;
     }
 
-    // User needs onboarding if they haven't filled basic health info
-    return !user.gender || !user.age || !user.weight || !user.height || !user.fitness_goal;
+    // User needs onboarding nếu CHƯA có thông tin sức khỏe cơ bản
+    // Trước đây còn check cả fitness_goal nên dù đã có name/gender/age/weight/height
+    // vẫn bị coi là chưa onboarding. Ở đây chỉ yêu cầu 4 field chính:
+    // - gender
+    // - age
+    // - weight
+    // - height
+    // fitness_goal trở thành optional, có thể set sau.
+    return (
+      !user.gender ||
+      user.age == null ||
+      user.weight == null ||
+      user.height == null
+    );
   }
 
   // Get available goals

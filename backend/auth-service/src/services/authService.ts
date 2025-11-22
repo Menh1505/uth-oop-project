@@ -1,13 +1,17 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
 import pool from '../config/database';
 import { jwtConfig } from '../config/jwt';
 // RabbitMQ disabled - causes crashes on startup
 // Using stub implementation instead
 import { MessageService } from './messageService';
+import { cacheAuthUser } from './cacheService';
+import type { AuthUserRecord, CachedAuthUserPayload } from '../types/auth';
 import {
   signAccess, generateRefreshToken, hashOpaqueToken, compareOpaqueToken
 } from '../utils/tokens';
+import { verifyFirebaseIdToken } from '../config/firebase';
 
 type LoginResult = { access_token: string; expires_at: number; refresh_token: string };
 
@@ -68,6 +72,103 @@ export class AuthService {
     await MessageService.publish('user.logged_in', {
       userId: user.id, email: user.email, role, timestamp: new Date().toISOString()
     });
+    const payload: CachedAuthUserPayload = {
+      user: user as AuthUserRecord,
+      roles,
+      cachedAt: new Date().toISOString(),
+    };
+    await cacheAuthUser(email, payload);
+
+    return { access_token: access, expires_at: exp * 1000, refresh_token: refresh };
+  }
+
+  static async loginWithGoogle(idToken: string): Promise<LoginResult> {
+    const decoded: any = await verifyFirebaseIdToken(idToken);
+    const firebaseUid: string = decoded.uid;
+    const email: string | undefined = decoded.email;
+    if (!firebaseUid || !email) {
+      throw new Error('Invalid Google token');
+    }
+
+    let user: any = null;
+
+    const identityRes = await pool.query(
+      'SELECT user_id FROM identities WHERE provider = $1 AND provider_uid = $2',
+      ['google', firebaseUid]
+    );
+
+    if (identityRes.rows.length > 0) {
+      const userId = identityRes.rows[0].user_id;
+      const u = await pool.query(
+        'SELECT * FROM users_auth WHERE id = $1 AND status = $2',
+        [userId, 'active']
+      );
+      user = u.rows[0] || null;
+    } else {
+      const existingByEmail = await pool.query(
+        'SELECT * FROM users_auth WHERE email = $1',
+        [email]
+      );
+      if (existingByEmail.rows.length > 0) {
+        user = existingByEmail.rows[0];
+      } else {
+        const randomPassword = randomBytes(32).toString('hex');
+        const hash = await bcrypt.hash(randomPassword, 10);
+        const ins = await pool.query(
+          'INSERT INTO users_auth (email, username, password_hash, status) VALUES ($1,$2,$3,$4) RETURNING *',
+          [email, decoded.name || null, hash, 'active']
+        );
+        user = ins.rows[0];
+
+        await MessageService.publish('user.registered', {
+          userId: user.id,
+          email: user.email,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      await pool.query(
+        'INSERT INTO identities (user_id, provider, provider_uid, meta) VALUES ($1,$2,$3,$4) ON CONFLICT (provider, provider_uid) DO NOTHING',
+        [
+          user.id,
+          'google',
+          firebaseUid,
+          JSON.stringify({ email: decoded.email, name: decoded.name, picture: decoded.picture }),
+        ]
+      );
+    }
+
+    if (!user || user.status !== 'active') {
+      throw new Error('User disabled');
+    }
+
+    const roles = await getUserRoles(user.id);
+    const role = pickRole(roles);
+
+    const { token: access, exp } = signAccess({ id: user.id, email: user.email, role });
+    const refresh = generateRefreshToken();
+    const refreshHash = await hashOpaqueToken(refresh);
+    const refreshExpSec = parseInt(process.env.REFRESH_TTL_SEC || `${60 * 60 * 24 * 30}`, 10);
+    const expiresAt = new Date(Date.now() + refreshExpSec * 1000);
+
+    await pool.query(
+      'INSERT INTO sessions (user_id, refresh_token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4,$5)',
+      [user.id, refreshHash, 'google', null, expiresAt]
+    );
+
+    await MessageService.publish('user.logged_in', {
+      userId: user.id,
+      email: user.email,
+      role,
+      provider: 'google',
+      timestamp: new Date().toISOString(),
+    });
+    const payload: CachedAuthUserPayload = {
+      user: user as AuthUserRecord,
+      roles,
+      cachedAt: new Date().toISOString(),
+    };
+    await cacheAuthUser(email, payload);
 
     return { access_token: access, expires_at: exp * 1000, refresh_token: refresh };
   }

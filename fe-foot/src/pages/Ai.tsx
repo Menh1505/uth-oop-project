@@ -32,9 +32,25 @@ export default function Ai() {
     try {
       setLoading(true);
       setError("");
-      const userId = "current";
-      const data = await ApiClient.get<Recommendation[]>(`/recommendations/users/${userId}/recommendations`);
-      setRecommendations(data || []);
+      const userId = (profile as any)?.id ?? (profile as any)?.userId ?? 0;
+      // Backend recommendation-service exposes GET /recommendations/daily/:userId
+      const res: any = await ApiClient.get(`/recommendations/daily/${userId}`);
+      const rec = res?.recommendation || res?.recommendations || [];
+      const mapped: Recommendation[] = Array.isArray(rec)
+        ? rec
+        : [
+            {
+              id: String(rec.recommendation_id || "rec_1"),
+              type: rec.type || "meal",
+              title: rec.title || "Gợi ý bữa ăn",
+              description: rec.content || "",
+              calories: rec.calories,
+              protein: rec.protein,
+              carbs: rec.carbs,
+              fat: rec.fat,
+            },
+          ];
+      setRecommendations(mapped || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Lỗi tải gợi ý");
       useMockSuggestions();

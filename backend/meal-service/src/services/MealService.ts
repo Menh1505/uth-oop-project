@@ -32,9 +32,7 @@ export class MealService {
 
   // Get all meals for user
   static async getUserMeals(userId: string): Promise<Meal[]> {
-    const query = 'SELECT * FROM meals WHERE user_id = $1 ORDER BY meal_date DESC, meal_time DESC LIMIT 100';
-    // Simple query - can be optimized with MealRepository if needed
-    return [];
+    return await MealRepository.getUserMeals(userId, 100);
   }
 
   // Get meal by ID with foods

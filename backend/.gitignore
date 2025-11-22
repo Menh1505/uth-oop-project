@@ -299,7 +299,7 @@ ENV/
 *.model
 *.pkl
 *.joblib
-models/
+# models/  # Temporarily commented to allow editing src/models/
 checkpoints/
 
 # ============================================================================

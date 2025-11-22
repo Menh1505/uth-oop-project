@@ -4,8 +4,12 @@ import { MealController } from '../controllers/MealController';
 
 const router = Router();
 
-// Health check
+// Health check (no auth needed)
 router.get('/status', MealController.status);
+
+// Meal query routes (specific routes BEFORE generic :mealId)
+router.get('/date/:date', authenticate, MealController.getMealsByDate);
+router.get('/range/:startDate/:endDate', authenticate, MealController.getMealsByDateRange);
 
 // Meal CRUD routes (all require auth)
 router.post('/', authenticate, MealController.createMeal);
@@ -13,10 +17,6 @@ router.get('/', authenticate, MealController.getMeals); // List meals
 router.get('/:mealId', authenticate, MealController.getMeal);
 router.put('/:mealId', authenticate, MealController.updateMeal);
 router.delete('/:mealId', authenticate, MealController.deleteMeal);
-
-// Meal query routes
-router.get('/date/:date', authenticate, MealController.getMealsByDate);
-router.get('/range/:startDate/:endDate', authenticate, MealController.getMealsByDateRange);
 
 // Meal food management routes
 router.post('/:mealId/foods', authenticate, MealController.addFoodToMeal);

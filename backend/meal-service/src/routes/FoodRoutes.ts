@@ -4,22 +4,22 @@ import { FoodController } from '../controllers/FoodController';
 
 const router = Router();
 
-// Food CRUD routes
-router.post('/', authenticate, FoodController.createFood);
-router.get('/:foodId', authenticate, FoodController.getFood);
-router.put('/:foodId', authenticate, FoodController.updateFood);
-router.delete('/:foodId', authenticate, FoodController.deleteFood);
-
-// Food search and discovery routes
-router.get('/', authenticate, FoodController.searchFoods);
-router.get('/category/:category', authenticate, FoodController.getFoodsByCategory);
+// Food search and discovery routes (specific paths BEFORE generic :foodId)
 router.get('/categories/all', authenticate, FoodController.getFoodCategories);
+router.get('/category/:category', authenticate, FoodController.getFoodsByCategory);
 router.get('/barcode/:barcode', authenticate, FoodController.findFoodByBarcode);
 router.get('/popular/list', authenticate, FoodController.getPopularFoods);
 router.get('/recent/list', authenticate, FoodController.getRecentFoods);
 
 // Nutrition calculation routes
-router.post('/:foodId/nutrition', authenticate, FoodController.calculateNutrition);
 router.post('/nutrition/compare', authenticate, FoodController.compareNutrition);
+router.post('/:foodId/nutrition', authenticate, FoodController.calculateNutrition);
+
+// Food CRUD routes
+router.post('/', authenticate, FoodController.createFood);
+router.get('/', authenticate, FoodController.searchFoods);
+router.get('/:foodId', authenticate, FoodController.getFood);
+router.put('/:foodId', authenticate, FoodController.updateFood);
+router.delete('/:foodId', authenticate, FoodController.deleteFood);
 
 export default router;
