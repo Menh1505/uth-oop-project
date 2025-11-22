@@ -68,11 +68,7 @@ services:
       - rabbitmq
       - auth-service
       - user-service
-      - meal-service
-      - exercise-service
       - goal-service
-      - recommendation-service
-      - payment-service
       - admin-service
     networks:
       - backend
@@ -114,35 +110,35 @@ services:
       - backend
 
 
-  meal-service:
-    build: ./meal-service
-    expose:
-      - "3004"
-    environment:
-      MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_meal_db?authSource=admin
-      PORT: 3004
-      JWT_SECRET: shared-secret
-      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-    depends_on:
-      - mongodb
-      - rabbitmq
-    networks:
-      - backend
+  # meal-service:
+  #   build: ./meal-service
+  #   expose:
+  #     - "3004"
+  #   environment:
+  #     MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_meal_db?authSource=admin
+  #     PORT: 3004
+  #     JWT_SECRET: shared-secret
+  #     RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+  #   depends_on:
+  #     - mongodb
+  #     - rabbitmq
+  #   networks:
+  #     - backend
 
 
-  exercise-service:
-    build: ./exercise-service
-    expose:
-      - "3005"
-    environment:
-      MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_exercise_db?authSource=admin
-      PORT: 3005
-      JWT_SECRET: shared-secret
-    depends_on:
-      - mongodb
-      - rabbitmq
-    networks:
-      - backend
+  # exercise-service:
+  #   build: ./exercise-service
+  #   expose:
+  #     - "3005"
+  #   environment:
+  #     MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_exercise_db?authSource=admin
+  #     PORT: 3005
+  #     JWT_SECRET: shared-secret
+  #   depends_on:
+  #     - mongodb
+  #     - rabbitmq
+  #   networks:
+  #     - backend
 
 
   goal-service:
@@ -157,36 +153,6 @@ services:
       - mongodb
     networks:
       - backend
-
-
-  recommendation-service:
-    build: ./recommendation-service
-    expose:
-      - "3007"
-    environment:
-      MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_reco_db?authSource=admin
-      PORT: 3007
-      JWT_SECRET: shared-secret
-    depends_on:
-      - mongodb
-    networks:
-      - backend
-
-
-  payment-service:
-    build: ./payment-service
-    expose:
-      - "3008"
-    environment:
-      MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_payment_db?authSource=admin
-      PORT: 3008
-      JWT_SECRET: shared-secret
-    depends_on:
-      - mongodb
-      - rabbitmq
-    networks:
-      - backend
-
 
   admin-service:
     build: ./admin-service
