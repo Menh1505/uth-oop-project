@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 
 const mainNav = [
   { to: "/journal/meals", label: "Bữa ăn" },
-  { to: "/journal/workouts", label: "Buổi tập" },
+  { to: "/exercise", label: "Buổi tập" },
   { to: "/ai", label: "AI gợi ý" },
   { to: "/analytics", label: "Analytics" },
   { to: "/menu", label: "Menu" },

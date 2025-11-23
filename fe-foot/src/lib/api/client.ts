@@ -1,5 +1,5 @@
 // API Client with Token Management + DEBUG LOG + FormData support
-const API_BASE = "http://localhost:3000/api";
+const API_BASE = "/api";
 
 interface RequestOptions extends RequestInit {
   baseURL?: string;

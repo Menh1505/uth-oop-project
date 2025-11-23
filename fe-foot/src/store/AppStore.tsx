@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   CartItem,
   CombinedProfile,
+  DailySummary,
   MealLog,
   Order,
   OrderStatus,
@@ -32,7 +33,8 @@ export type Store = {
   // journal
   meals: MealLog[];
   workouts: WorkoutLog[];
-  fetchMeals(): Promise<void>;
+  dailySummary: DailySummary | null;
+  fetchMeals(date?: string): Promise<DailySummary | null>;
   addMeal(m: Omit<MealLog, "id" | "time"> & { time?: string }): void;
   addWorkout(w: Omit<WorkoutLog, "id" | "time"> & { time?: string }): void;
 
@@ -62,6 +64,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   // journal
   const [meals, setMeals] = useState<MealLog[]>([]);
+  const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutLog[]>([]);
 
   // menu/cart
@@ -394,51 +397,71 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const fetchMeals: Store["fetchMeals"] = async () => {
+  const fetchMeals = useCallback<Store["fetchMeals"]>(async (date) => {
     const token =
       localStorage.getItem("authToken") || localStorage.getItem("accessToken");
-    if (!token) return;
+    if (!token) {
+      setDailySummary(null);
+      return null;
+    }
+    const targetDate = date || new Date().toISOString().slice(0, 10);
     try {
-      const res = await fetch("/api/meals/", {
+      const res = await fetch(`/api/meals/me?date=${targetDate}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return;
-      const data = await res.json();
-      // Expect { success, meals: [...]} from backend controller
-      const items = (data.meals || []) as any[];
+      if (!res.ok) {
+        setDailySummary(null);
+        return null;
+      }
+      const payload = await res.json();
+      const body = payload?.data ?? payload;
+      const items = Array.isArray(body?.meals) ? body.meals : [];
       const mapped: MealLog[] = items.map((m: any) => ({
-        id: m.meal_id || uid("meal"),
-        name: m.meal_name || m.meal_type || "Meal",
-        calories: Math.round(m.total_calories || 0),
-        protein: Math.round(m.total_protein || 0),
-        carbs: Math.round(m.total_carbs || 0),
-        fat: Math.round(m.total_fat || 0),
-        time: m.meal_date
-          ? `${m.meal_date}T${m.meal_time || "00:00"}:00`
+        id: m.id || m._id || uid("meal"),
+        name: m.ten_mon || m.loai_bua_an || "Bữa ăn",
+        meal_name: m.ten_mon,
+        meal_type: m.loai_bua_an,
+        meal_date: m.ngay_an,
+        meal_time: m.thoi_gian_an,
+        calories: Math.round(m.luong_calories || 0),
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        time: m.ngay_an
+          ? `${m.ngay_an}T${(m.thoi_gian_an || "00:00")
+              .toString()
+              .padStart(5, "0")}:00`
           : nowISO(),
       }));
       setMeals(mapped);
+      const summary = (body?.summary || null) as DailySummary | null;
+      setDailySummary(summary);
+      return summary;
     } catch (e) {
       console.warn("fetchMeals failed, keep local state", e);
+      setDailySummary(null);
+      return null;
     }
-  };
+  }, []);
 
   const addMeal: Store["addMeal"] = async (partial) => {
     const token =
       localStorage.getItem("authToken") || localStorage.getItem("accessToken");
-    // Default fields for backend payload
     const now = new Date();
     const y = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
     const HH = String(now.getHours()).padStart(2, "0");
     const MI = String(now.getMinutes()).padStart(2, "0");
+
     const payload = {
-      meal_type: "Snack",
-      meal_date: `${y}-${mm}-${dd}`,
-      meal_time: `${HH}:${MI}`,
-      meal_name: partial.name || "Meal",
-      notes: "",
+      ten_mon: partial.name || "Bữa ăn nhanh",
+      loai_bua_an: "Ăn vặt",
+      luong_calories: Math.max(0, Math.round(partial.calories || 0)),
+      khoi_luong: 100,
+      ngay_an: `${y}-${mm}-${dd}`,
+      thoi_gian_an: `${HH}:${MI}`,
+      ghi_chu: "",
     };
 
     if (token) {
@@ -459,7 +482,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         console.warn("addMeal API failed, fallback to local add", e);
       }
     }
-    // Fallback local append
+
     setMeals((prev) => [
       { id: uid("meal"), time: partial.time ?? nowISO(), ...partial },
       ...prev,
@@ -555,7 +578,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     registerSuccess,
     meals,
     workouts,
-    fetchMeals,
+    dailySummary,
+      fetchMeals,
     addMeal,
     addWorkout,
     cart,

@@ -179,6 +179,18 @@ export type Goal = {
   updated_at: string; // ISO 8601 datetime
 };
 
+export type DailySummaryStatus = "Đạt mục tiêu" | "Chưa đạt" | "Vượt mức";
+
+export type DailySummary = {
+  id: string;
+  ngay: string;
+  user_id: string;
+  tong_calo: number;
+  calo_muc_tieu?: number | null;
+  trang_thai_calo?: DailySummaryStatus;
+  updated_at?: string;
+};
+
 // Recommendation Service Types
 export type Recommendation = {
   recommendation_id: string; // UUID
@@ -555,6 +567,35 @@ export type WorkoutLog = {
   caloriesBurned: number;
   durationMin: number;
   time: string; // ISO
+};
+
+export type ExerciseTemplate = {
+  id: string;
+  name: string;
+  description?: string | null;
+  muscle_group?: string | null;
+  intensity?: string | null;
+  default_duration?: number | null;
+  default_calories?: number | null;
+};
+
+export type ExerciseSession = {
+  id: string;
+  exercise_name: string;
+  duration_minutes: number;
+  calories_burned: number;
+  date: string;
+  start_time?: string | null;
+  notes?: string | null;
+  template_id?: string | null;
+  created_at?: string;
+};
+
+export type DailyExerciseSummary = {
+  date: string;
+  total_duration: number;
+  total_calories: number;
+  sessions: ExerciseSession[];
 };
 
 export type MenuItem = {

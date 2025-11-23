@@ -13,6 +13,7 @@ const GoogleSetupDashboard = lazy(() => import("./pages/GoogleSetupDashboard"));
 const Journal = lazy(() => import("./pages/Journal"));
 const Meals = lazy(() => import("./pages/journal/Meals"));
 const Workouts = lazy(() => import("./pages/journal/Workouts"));
+const ExercisePage = lazy(() => import("./pages/ExercisePage"));
 const Ai = lazy(() => import("./pages/Ai"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const Menu = lazy(() => import("./pages/Menu"));
@@ -241,6 +242,7 @@ export default function App() {
                 <Route path="/menu" element={<Menu />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order" element={<Order />} />
+                <Route path="/exercise" element={<ExercisePage />} />
                 <Route path="/profile" element={<Profile />} />
               </Route>
             </Route>

@@ -2,8 +2,10 @@ import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { ApiClient } from "../lib/api/client";
+import type { DailySummary, DailySummaryStatus } from "../types";
 
 interface UserData {
   user_id: string;
@@ -32,6 +34,47 @@ interface UserGoalSummary {
   trang_thai: string;
 }
 
+type MealTypeVi = "Bữa sáng" | "Bữa trưa" | "Bữa tối" | "Ăn vặt";
+
+interface MealEntry {
+  id: string;
+  ten_mon: string;
+  loai_bua_an: MealTypeVi;
+  luong_calories: number;
+  khoi_luong: number;
+  ngay_an: string;
+  thoi_gian_an: string;
+  ghi_chu?: string | null;
+}
+
+const MEAL_TYPE_OPTIONS: MealTypeVi[] = [
+  "Bữa sáng",
+  "Bữa trưa",
+  "Bữa tối",
+  "Ăn vặt",
+];
+
+const STATUS_STYLES: Record<
+  DailySummaryStatus,
+  { bg: string; text: string; border: string }
+> = {
+  "Đạt mục tiêu": {
+    bg: "bg-emerald-500/10",
+    text: "text-emerald-300",
+    border: "border-emerald-500/30",
+  },
+  "Chưa đạt": {
+    bg: "bg-amber-500/10",
+    text: "text-amber-200",
+    border: "border-amber-500/30",
+  },
+  "Vượt mức": {
+    bg: "bg-red-500/10",
+    text: "text-red-200",
+    border: "border-red-500/30",
+  },
+};
+
 export default function ProfilePage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -47,6 +90,142 @@ export default function ProfilePage() {
   const [goalSetupVisible, setGoalSetupVisible] = useState(false);
   const [goalSetupWeight, setGoalSetupWeight] = useState<number | null>(null);
   const [goalSetupDuration, setGoalSetupDuration] = useState<number>(8);
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const [selectedMealDate, setSelectedMealDate] = useState<string>(todayISO);
+  const [meals, setMeals] = useState<MealEntry[]>([]);
+  const [mealSummary, setMealSummary] = useState<DailySummary | null>(null);
+  const [mealLoading, setMealLoading] = useState(false);
+  const [mealError, setMealError] = useState<string | null>(null);
+  const [savingMeal, setSavingMeal] = useState(false);
+  const [mealForm, setMealForm] = useState({
+    ten_mon: "Cơm gà",
+    loai_bua_an: "Bữa trưa" as MealTypeVi,
+    luong_calories: "600",
+    khoi_luong: "350",
+    thoi_gian_an: new Date().toISOString().slice(11, 16),
+    ghi_chu: "",
+  });
+
+  const fetchMealsForDate = useCallback(
+    async (date: string) => {
+      try {
+        setMealLoading(true);
+        setMealError(null);
+        const query = date ? `?date=${date}` : "";
+        const data = await ApiClient.get<{
+          date: string;
+          meals: MealEntry[];
+          summary: DailySummary;
+        }>(`/meals/me${query}`);
+
+        if (data?.date) {
+          setSelectedMealDate((current) =>
+            current === data.date ? current : data.date
+          );
+        }
+
+        const sortedMeals = [...(data?.meals || [])].sort((a, b) =>
+          `${a.thoi_gian_an}`.localeCompare(`${b.thoi_gian_an}`)
+        );
+        setMeals(sortedMeals);
+        setMealSummary(data?.summary ?? null);
+      } catch (error: any) {
+        console.error("Failed to fetch meals:", error);
+        setMealError(error?.message || "Không thể tải danh sách bữa ăn");
+      } finally {
+        setMealLoading(false);
+      }
+    },
+    []
+  );
+
+  const handleMealFormChange = (field: keyof typeof mealForm, value: string) => {
+    setMealForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateMealEntry = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!mealForm.ten_mon.trim()) {
+      setMealError("Vui lòng nhập tên món ăn");
+      return;
+    }
+
+    const calories = Number(mealForm.luong_calories);
+    const weight = Number(mealForm.khoi_luong);
+    if (!Number.isFinite(calories) || calories <= 0) {
+      setMealError("Calories phải lớn hơn 0");
+      return;
+    }
+    if (!Number.isFinite(weight) || weight <= 0) {
+      setMealError("Khối lượng phải lớn hơn 0");
+      return;
+    }
+
+    setSavingMeal(true);
+    setMealError(null);
+    try {
+      await ApiClient.post("/meals", {
+        ten_mon: mealForm.ten_mon.trim(),
+        loai_bua_an: mealForm.loai_bua_an,
+        luong_calories: calories,
+        khoi_luong: weight,
+        ngay_an: selectedMealDate,
+        thoi_gian_an: mealForm.thoi_gian_an,
+        ghi_chu: mealForm.ghi_chu?.trim() || undefined,
+      });
+      setMealForm((prev) => ({
+        ...prev,
+        ten_mon: "Cơm gà",
+        luong_calories: "600",
+        khoi_luong: "350",
+        ghi_chu: "",
+      }));
+      await fetchMealsForDate(selectedMealDate);
+    } catch (error: any) {
+      console.error("Create meal error:", error);
+      setMealError(error?.message || "Không thể thêm món ăn");
+    } finally {
+      setSavingMeal(false);
+    }
+  };
+
+  const handleEditMeal = async (meal: MealEntry) => {
+    const ten_mon =
+      window.prompt("Tên món ăn", meal.ten_mon)?.trim() || meal.ten_mon;
+    const calInput = window.prompt(
+      "Lượng calories (kcal)",
+      String(meal.luong_calories)
+    );
+    if (calInput === null) return;
+    const luong_calories = Number(calInput);
+    if (!Number.isFinite(luong_calories) || luong_calories <= 0) {
+      alert("Calories không hợp lệ");
+      return;
+    }
+
+    try {
+      await ApiClient.put(`/meals/${meal.id}`, {
+        ten_mon,
+        luong_calories,
+      });
+      await fetchMealsForDate(selectedMealDate);
+    } catch (error: any) {
+      console.error("Update meal error:", error);
+      alert(error?.message || "Không thể cập nhật món ăn");
+    }
+  };
+
+  const handleDeleteMeal = async (mealId: string, name: string) => {
+    if (!window.confirm(`Xoá món "${name}" khỏi ngày này?`)) return;
+    try {
+      await ApiClient.delete(`/meals/${mealId}`);
+      await fetchMealsForDate(selectedMealDate);
+    } catch (error: any) {
+      console.error("Delete meal error:", error);
+      alert(error?.message || "Không thể xoá món ăn");
+    }
+  };
 
   // Fetch user data on mount
   useEffect(() => {
@@ -105,6 +284,11 @@ export default function ProfilePage() {
       setGoalSetupDuration(8);
     }
   }, [userGoal]);
+
+  useEffect(() => {
+    if (!userData) return;
+    fetchMealsForDate(selectedMealDate);
+  }, [userData, selectedMealDate, fetchMealsForDate]);
 
   const openGoalSetup = () => {
     setGoalSetupWeight(
@@ -277,6 +461,18 @@ export default function ProfilePage() {
       setSaving(false);
     }
   };
+
+  const summaryPercent =
+    mealSummary?.calo_muc_tieu && mealSummary.calo_muc_tieu > 0
+      ? Math.min(
+          150,
+          Math.round((mealSummary.tong_calo / mealSummary.calo_muc_tieu) * 100)
+        )
+      : null;
+  const summaryStyle =
+    mealSummary?.trang_thai_calo && STATUS_STYLES[mealSummary.trang_thai_calo]
+      ? STATUS_STYLES[mealSummary.trang_thai_calo]
+      : STATUS_STYLES["Chưa đạt"];
 
   if (loading) {
     return (
@@ -814,6 +1010,274 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Meal Diary Section */}
+          <div className="mt-6 rounded-2xl border border-slate-800/70 bg-slate-900/70 px-4 py-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold tracking-wide text-slate-200 uppercase">
+                  Nhật ký bữa ăn
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Ghi lại món ăn và lượng calo tiêu thụ mỗi ngày
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="date"
+                  value={selectedMealDate}
+                  onChange={(e) => setSelectedMealDate(e.target.value)}
+                  className="h-9 rounded-xl border-slate-700 bg-slate-900 text-slate-50"
+                />
+                <Button
+                  variant="ghost"
+                  onClick={() => fetchMealsForDate(selectedMealDate)}
+                  className="h-9 rounded-xl text-sm font-medium"
+                >
+                  Làm mới
+                </Button>
+              </div>
+            </div>
+
+            {mealError && (
+              <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                {mealError}
+              </div>
+            )}
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)]">
+              <div className="space-y-4">
+                <div
+                  className={`rounded-2xl border ${summaryStyle.border} ${summaryStyle.bg} px-4 py-3 transition`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                        Tổng calories ngày {selectedMealDate}
+                      </p>
+                      <p className="text-2xl font-semibold text-slate-50">
+                        {mealSummary?.tong_calo ?? 0} kcal
+                      </p>
+                    </div>
+                    {mealSummary && (
+                      <span
+                        className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold ${summaryStyle.bg} ${summaryStyle.text} ${summaryStyle.border}`}
+                      >
+                        {mealSummary.trang_thai_calo}
+                      </span>
+                    )}
+                  </div>
+                  {mealSummary?.calo_muc_tieu ? (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Mục tiêu: {mealSummary.calo_muc_tieu} kcal</span>
+                        <span>
+                          {summaryPercent !== null ? `${summaryPercent}%` : ""}
+                        </span>
+                      </div>
+                      <div className="mt-1 h-2 rounded-full bg-slate-800">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-indigo-500"
+                          style={{
+                            width: `${
+                              summaryPercent !== null
+                                ? Math.min(summaryPercent, 150)
+                                : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[11px] text-slate-400">
+                      Bạn chưa có mục tiêu calo. Thêm mục tiêu ở phần "Mục tiêu
+                      cá nhân" để tự động đối chiếu mỗi ngày.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {mealLoading ? (
+                    <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 px-4 py-6 text-center text-sm text-slate-400">
+                      Đang tải dữ liệu món ăn...
+                    </div>
+                  ) : meals.length ? (
+                    <ul className="space-y-2">
+                      {meals.map((meal) => (
+                        <li
+                          key={meal.id}
+                          className="rounded-2xl border border-slate-800/70 bg-slate-900/60 px-4 py-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-base font-semibold text-slate-50">
+                                {meal.ten_mon}
+                              </div>
+                              <div className="text-xs text-slate-400">
+                                {meal.loai_bua_an} · {meal.luong_calories} kcal ·{" "}
+                                {meal.khoi_luong}g
+                              </div>
+                              <div className="text-[11px] text-slate-500">
+                                {meal.ngay_an} lúc {meal.thoi_gian_an}
+                              </div>
+                              {meal.ghi_chu && (
+                                <div className="mt-1 text-xs text-slate-400">
+                                  Ghi chú: {meal.ghi_chu}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                className="h-8 rounded-xl px-3 text-xs"
+                                onClick={() => handleEditMeal(meal)}
+                              >
+                                Sửa
+                              </Button>
+                              <Button
+                                variant="danger"
+                                className="h-8 rounded-xl px-3 text-xs"
+                                onClick={() => handleDeleteMeal(meal.id, meal.ten_mon)}
+                              >
+                                Xoá
+                              </Button>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-800/70 bg-slate-900/40 px-4 py-5 text-center text-sm text-slate-400">
+                      Chưa có món ăn nào cho ngày {selectedMealDate}. Hãy thêm
+                      món bên phải.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800/70 bg-slate-900/80 px-4 py-4">
+                <h4 className="text-sm font-semibold text-slate-100">
+                  Thêm món ăn
+                </h4>
+                <p className="text-xs text-slate-400 mb-4">
+                  Dữ liệu lưu trực tiếp vào MongoDB của meal-service
+                </p>
+                <form onSubmit={handleCreateMealEntry} className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Tên món
+                    </label>
+                    <Input
+                      value={mealForm.ten_mon}
+                      onChange={(e) =>
+                        handleMealFormChange("ten_mon", e.target.value)
+                      }
+                      placeholder="Ví dụ: Cơm gà, Phở bò..."
+                      className="h-9 rounded-xl border-slate-700 bg-slate-900 text-slate-50"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Loại bữa ăn
+                    </label>
+                    <Select
+                      value={mealForm.loai_bua_an}
+                      onChange={(e) =>
+                        handleMealFormChange(
+                          "loai_bua_an",
+                          e.target.value as MealTypeVi
+                        )
+                      }
+                      className="h-9 rounded-xl border-slate-700 bg-slate-900 text-slate-50"
+                    >
+                      {MEAL_TYPE_OPTIONS.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] uppercase tracking-wide text-slate-400">
+                        Calories (kcal)
+                      </label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={mealForm.luong_calories}
+                        onChange={(e) =>
+                          handleMealFormChange("luong_calories", e.target.value)
+                        }
+                        className="h-9 rounded-xl border-slate-700 bg-slate-900 text-slate-50"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] uppercase tracking-wide text-slate-400">
+                        Khối lượng (g)
+                      </label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={mealForm.khoi_luong}
+                        onChange={(e) =>
+                          handleMealFormChange("khoi_luong", e.target.value)
+                        }
+                        className="h-9 rounded-xl border-slate-700 bg-slate-900 text-slate-50"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] uppercase tracking-wide text-slate-400">
+                        Thời gian ăn
+                      </label>
+                      <Input
+                        type="time"
+                        value={mealForm.thoi_gian_an}
+                        onChange={(e) =>
+                          handleMealFormChange("thoi_gian_an", e.target.value)
+                        }
+                        className="h-9 rounded-xl border-slate-700 bg-slate-900 text-slate-50"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] uppercase tracking-wide text-slate-400">
+                        Ngày ăn
+                      </label>
+                      <Input
+                        type="text"
+                        value={selectedMealDate}
+                        disabled
+                        className="h-9 rounded-xl border border-dashed border-slate-700 bg-slate-900/50 text-center text-slate-400"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] uppercase tracking-wide text-slate-400">
+                      Ghi chú
+                    </label>
+                    <textarea
+                      value={mealForm.ghi_chu}
+                      onChange={(e) =>
+                        handleMealFormChange("ghi_chu", e.target.value)
+                      }
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 focus:border-slate-500 focus:outline-none"
+                      placeholder="Ví dụ: Ăn cùng salad, ít dầu..."
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={savingMeal}
+                    className="w-full h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-sm font-semibold disabled:opacity-60"
+                  >
+                    {savingMeal ? "Đang lưu..." : "Lưu món ăn"}
+                  </Button>
+                </form>
               </div>
             </div>
           </div>
