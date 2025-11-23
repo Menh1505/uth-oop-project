@@ -1,0 +1,178 @@
+version: "3.8"
+
+services:
+  # ==========================
+  # MongoDB
+  # ==========================
+  mongodb:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================
+  # Redis
+  # ==========================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - backend
+
+  # ==========================
+  # RabbitMQ
+  # ==========================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - backend
+
+  # ==========================
+  # NGINX Gateway
+  # ==========================
+  nginx:
+    image: nginx:latest
+    ports:
+      - "3000:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - mongodb
+      - redis
+      - rabbitmq
+      - auth-service
+      - user-service
+      - goal-service
+      - admin-service
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # ==========================
+  # AUTH SERVICE
+  # ==========================
+  auth-service:
+    build: ./auth-service
+    expose:
+      - "3001"
+    environment:
+      MONGODB_URI: mongodb://admin:admin@mongodb:27017/fitfood_auth_db?authSource=admin
+      PORT: 3001
+      JWT_SECRET: shared-secret
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      FIREBASE_PROJECT_ID: proj-mic-d4567
+      FIREBASE_CLIENT_EMAIL: firebase-adminsdk-fbsvc@proj-mic-d4567.iam.gserviceaccount.com
+      FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDL9L46yw8Yseke\nmNpxztmh3Ow/JMXzkSMzn3lEypUyw6UXSuCJEDfbyDgf/QXMNsyYih08k7qM0414\nxhq1XVKRk3ZlyMFDVxNbjW146s3gPqLKb1QD2R7z3BTVOeKWjXSNX1fUmUNoSTks\nCi4TUPcuB+LFdX2j2pVQRICZ48BV33zNWoel95yZOhJpb1jKxP8xL8SBQkz8nUeV\nPBKHiUbiKI9KFm+fJ/ePf9RUt7DlF1f4IpocGoSyj+PvKXFv0/hv8ckFwKVuXjIn\nPYhxJL3h5GcbX/xUdq1zXztSG4lhMFOnNpVaeJEtru34khZG1p2m42WXyYXzPFh6\n8SV5dsrBAgMBAAECgf8Cp9fSQX1GKmA0Bcl9BzR45xIsavjTiGWXm9FNvqrdU67S\nntGi9z3C9C3G54SBJDWFxvFFLfyVLiv+u+rycZn29fSUtAh61/y93xmNztY0v/Fe\nsWm7+G0Zam7bApCbZTwfRck0UMqP5mQtg/Rq9qLr9oOoDoo+7URZxzU6y7xgDIL0\n1zbw7Ig2UrPqgpsYoHhqUhcxgh6xEbGsG0WRTOVTKdxj12T6FdixLkLzcjnY3WCj\n0SURAd2cbI1YJB8hycwVOoeJsBgerwu7KtXXy25XEzAnLGFofWwzfYmnUP/n7Je+\nrfQyL+PqaezL/T0/tZoDLO/lks+bMNSypC/ivRkCgYEA60NCNEnV9odrTkHqV6Qk\nzbm4jTI9HP6AIB79dsNcRSd680LdtJX8GJC+HTgy6xriw4mSZrdfRVDodzXz8emQ\nFUIQmmP3KMB5vqDuR62riIiGOAiiVB5qJ0WyWsKF/iVdy6nDWujgKqGuz4zLeVrU\nYJrclz+stGEy3oCaH5WnsNsCgYEA3e8LMOsW6Gm7scpc7C5bFKEdKW3Thwkyu1Jc\ngZg8noLsJLevr2RTCa/e4DL3L0M87axtiSXaD+UBS1DE6o0vud8YjV3lvqVXug+K\nJl/kKv9PNyouSFmZhE30Ik38+igSoWiKXZn4K3Sl9KWQpDzA7AOKrzDmdvhOT1YT\nEJy2x5MCgYEAt7tJQui/Ds9ngDB+QX/RtlDqzmqDy9b+XReWv1+G+gMBRGXeG6Be\nxxiTQOKY8X+HxUn1af6fitTLF/6syyqq+c8khE65wbu/2J56OMRrCDAHEk+75pHy\nOUV3KuZsGrU38UxdYuwn1WN70F+WsOm8ns2SpRR3Xk/imF46/5uy4K0CgYAo3e/N\nnjylp3Kslnrt8stKzTA1hMfCwerZm5z1MDdZaPpa+IgdX/f6fKwp1Li3t0Xs7idt\nbc7txlmqqMDaAA2dyHsY7QV1SbURyfLChj3ZvRG1Mss6/2TJfCFMf9fpqJ9loX55\nJfUQ63XzytkLpTRRQYW0JOkLV0X0TgFMuc7eiQKBgQDE8wXg7VsWdKfnyeZDDSTN\n4fq8dEQjLEbpC54GaTeCR0oESRhJXmEEpXZsDoQe/JtlkuCzPmij5DB6Pe41idSx\nAlb1BigpiQavfG9UcLYGxM0x2hmvGEJ8BjMNEETtuWGve48BWofOIqBQkX6T/PtF\nRu6go+Rbj430atUEYcKrlg==\n-----END PRIVATE KEY-----\n"
+    depends_on:
+      - mongodb
+      - rabbitmq
+    networks:
+      - backend
+
+  user-service:
+    build: ./user-service
+    expose:
+      - "3002"
+    environment:
+      MONGODB_URI: mongodb://admin:admin@mongodb:27017/fitfood_user_db?authSource=admin
+      PORT: 3002
+      JWT_SECRET: shared-secret
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      UPLOAD_ROOT: /app/uploads
+      PUBLIC_UPLOAD_BASE_URL: /api/users/uploads
+      SERVICE_UPLOAD_BASE_PATH: /users/uploads
+    depends_on:
+      - mongodb
+      - rabbitmq
+    networks:
+      - backend
+    volumes:
+      - ./uploads/user-service:/app/uploads
+
+  # meal-service:
+  #   build: ./meal-service
+  #   expose:
+  #     - "3004"
+  #   environment:
+  #     MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_meal_db?authSource=admin
+  #     PORT: 3004
+  #     JWT_SECRET: shared-secret
+  #     RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+  #   depends_on:
+  #     - mongodb
+  #     - rabbitmq
+  #   networks:
+  #     - backend
+
+  # exercise-service:
+  #   build: ./exercise-service
+  #   expose:
+  #     - "3005"
+  #   environment:
+  #     MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_exercise_db?authSource=admin
+  #     PORT: 3005
+  #     JWT_SECRET: shared-secret
+  #   depends_on:
+  #     - mongodb
+  #     - rabbitmq
+  #   networks:
+  #     - backend
+
+  goal-service:
+    build: ./goal-service
+    expose:
+      - "3006"
+    environment:
+      MONGODB_URI: mongodb://admin:admin@mongodb:27017/fitfood_goal_db?authSource=admin
+      PORT: 3006
+      JWT_SECRET: shared-secret
+    depends_on:
+      - mongodb
+    networks:
+      - backend
+
+  admin-service:
+    build: ./admin-service
+    expose:
+      - "3003"
+    environment:
+      MONGODB_URI: mongodb://admin:admin@mongodb:27017/fitfood_admin_db?authSource=admin
+      PORT: 3003
+      JWT_SECRET: shared-secret
+      USER_SERVICE_URL: http://user-service:3002
+      AUTH_SERVICE_URL: http://auth-service:3001
+    depends_on:
+      - mongodb
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  rabbitmq_data:
+  redis_data:
