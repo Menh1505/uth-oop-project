@@ -111,20 +111,20 @@ services:
     volumes:
       - ./uploads/user-service:/app/uploads
 
-  # meal-service:
-  #   build: ./meal-service
-  #   expose:
-  #     - "3004"
-  #   environment:
-  #     MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_meal_db?authSource=admin
-  #     PORT: 3004
-  #     JWT_SECRET: shared-secret
-  #     RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-  #   depends_on:
-  #     - mongodb
-  #     - rabbitmq
-  #   networks:
-  #     - backend
+  meal-service:
+    build: ./meal-service
+    expose:
+      - "3004"
+    environment:
+      MONGODB_URI: mongodb://admin:admin@mongodb:27017/fitfood_meal_db?authSource=admin
+      PORT: 3004
+      JWT_SECRET: shared-secret
+      GOAL_SERVICE_URL: http://goal-service:3006/goals
+    depends_on:
+      - mongodb
+      - goal-service
+    networks:
+      - backend
 
   # exercise-service:
   #   build: ./exercise-service

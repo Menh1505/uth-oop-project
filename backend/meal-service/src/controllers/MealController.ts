@@ -1,445 +1,159 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/authenticate';
 import { MealService } from '../services/MealService';
+import logger from '../config/logger';
 
 export class MealController {
-  // Health check
   static async status(_req: AuthRequest, res: Response) {
     res.json({
       service: 'meal-service',
       status: 'healthy',
-      version: '1.0.0',
-      database: process.env.DB_NAME || 'meal_db',
       timestamp: new Date().toISOString(),
+      database: 'MongoDB',
       endpoints: [
-        'POST /meals',
-        'GET /meals/:mealId',
-        'PUT /meals/:mealId',
+        'POST   /meals',
+        'GET    /meals/me?date=YYYY-MM-DD',
+        'GET    /meals/templates',
+        'PUT    /meals/:mealId',
         'DELETE /meals/:mealId',
-        'GET /meals/date/:date',
-        'GET /meals/range/:startDate/:endDate',
-        'POST /meals/:mealId/foods',
-        'PUT /meals/:mealId/foods/:mealFoodId',
-        'DELETE /meals/:mealId/foods/:mealFoodId',
-        'GET /nutrition/daily/:date',
-        'GET /nutrition/range/:startDate/:endDate',
-        'GET /meals/:mealId/analysis',
-        'POST /meals/recommendations'
-      ]
+        'GET    /meals/summary?date=YYYY-MM-DD',
+      ],
     });
   }
 
-  // List all meals for user
-  static async getMeals(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const meals = await MealService.getUserMeals(userId);
-      
-      res.json({
-        success: true,
-        count: meals?.length || 0,
-        meals: meals || []
-      });
-    } catch (error: any) {
-      console.error('Get meals error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch meals',
-        error: error.message
-      });
-    }
-  }
-
-  // Create new meal
   static async createMeal(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
+      if (!userId) return res.status(401).json({ success: false, message: 'Bạn chưa đăng nhập' });
 
-      const mealData = req.body;
-      const meal = await MealService.createMeal(userId, mealData);
-      
+      const authHeader = req.headers.authorization;
+      logger.info(
+        { userId, path: req.originalUrl, body: req.body },
+        '[meal-service] Incoming create meal request'
+      );
+      const result = await MealService.createMeal(userId, req.body, authHeader);
       res.status(201).json({
         success: true,
-        message: 'Meal created successfully',
-        meal
+        message: 'Đã thêm món ăn',
+        data: result,
       });
     } catch (error: any) {
-      console.error('Create meal error:', error);
+      logger.error(
+        { err: error, path: req.originalUrl, body: req.body },
+        '[meal-service] Create meal failed'
+      );
       res.status(400).json({
         success: false,
-        message: error.message || 'Failed to create meal',
-        error: error.message
+        message: error?.message || 'Không thể thêm món ăn',
       });
     }
   }
 
-  // Get meal by ID
-  static async getMeal(req: AuthRequest, res: Response) {
+  static async getMyMeals(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
+      if (!userId) return res.status(401).json({ success: false, message: 'Bạn chưa đăng nhập' });
 
-      const { mealId } = req.params;
-      const meal = await MealService.getMealById(userId, mealId);
-      
-      if (!meal) {
-        return res.status(404).json({
-          success: false,
-          message: 'Meal not found'
-        });
-      }
-
+      const authHeader = req.headers.authorization;
+      const date = (req.query.date as string) || '';
+      logger.info({ userId, path: req.originalUrl, date }, '[meal-service] Fetch meals request');
+      const result = await MealService.listMeals(userId, date, authHeader);
       res.json({
         success: true,
-        meal
+        data: result,
       });
     } catch (error: any) {
-      console.error('Get meal error:', error);
+      logger.error({ err: error, path: req.originalUrl }, '[meal-service] Fetch meals failed');
+      res.status(400).json({
+        success: false,
+        message: error?.message || 'Không thể lấy danh sách món ăn',
+      });
+    }
+  }
+
+  static async updateMeal(req: AuthRequest, res: Response) {
+    const mealId = req.params.mealId;
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ success: false, message: 'Bạn chưa đăng nhập' });
+
+      const authHeader = req.headers.authorization;
+      logger.info({ userId, mealId, path: req.originalUrl }, '[meal-service] Update meal request');
+      const result = await MealService.updateMeal(userId, mealId, req.body, authHeader);
+      res.json({
+        success: true,
+        message: 'Đã cập nhật món ăn',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error(
+        { err: error, path: req.originalUrl, mealId, body: req.body },
+        '[meal-service] Update meal failed'
+      );
+      res.status(400).json({
+        success: false,
+        message: error?.message || 'Không thể cập nhật món ăn',
+      });
+    }
+  }
+
+  static async deleteMeal(req: AuthRequest, res: Response) {
+    const mealId = req.params.mealId;
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ success: false, message: 'Bạn chưa đăng nhập' });
+
+      const authHeader = req.headers.authorization;
+      logger.info({ userId, mealId }, '[meal-service] Delete meal request');
+      const result = await MealService.deleteMeal(userId, mealId, authHeader);
+      res.json({
+        success: true,
+        message: 'Đã xoá món ăn',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error({ err: error, path: req.originalUrl, mealId }, '[meal-service] Delete meal failed');
+      res.status(400).json({
+        success: false,
+        message: error?.message || 'Không thể xoá món ăn',
+      });
+    }
+  }
+
+  static async getDailySummary(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ success: false, message: 'Bạn chưa đăng nhập' });
+
+      const authHeader = req.headers.authorization;
+      const date = (req.query.date as string) || '';
+      logger.info({ userId, date }, '[meal-service] Summary request');
+      const summary = await MealService.getSummary(userId, date, authHeader);
+      res.json({
+        success: true,
+        data: summary,
+      });
+    } catch (error: any) {
+      logger.error({ err: error, date: req.query.date }, '[meal-service] Summary failed');
+      res.status(400).json({
+        success: false,
+        message: error?.message || 'Không thể lấy tổng calories',
+      });
+    }
+  }
+
+  static async getTemplates(_req: Request, res: Response) {
+    try {
+      const templates = await MealService.listTemplates();
+      res.json({
+        success: true,
+        data: templates,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, '[meal-service] Fetch templates failed');
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch meal',
-        error: error.message
-      });
-    }
-  }
-
-  // Update meal
-  static async updateMeal(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { mealId } = req.params;
-      const updateData = req.body;
-      
-      const meal = await MealService.updateMeal(userId, mealId, updateData);
-      
-      res.json({
-        success: true,
-        message: 'Meal updated successfully',
-        meal
-      });
-    } catch (error: any) {
-      console.error('Update meal error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to update meal',
-        error: error.message
-      });
-    }
-  }
-
-  // Delete meal
-  static async deleteMeal(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { mealId } = req.params;
-      await MealService.deleteMeal(userId, mealId);
-      
-      res.json({
-        success: true,
-        message: 'Meal deleted successfully'
-      });
-    } catch (error: any) {
-      console.error('Delete meal error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to delete meal',
-        error: error.message
-      });
-    }
-  }
-
-  // Get meals by date
-  static async getMealsByDate(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { date } = req.params;
-      const meals = await MealService.getUserMealsByDate(userId, date);
-      
-      res.json({
-        success: true,
-        date,
-        meals,
-        count: meals.length
-      });
-    } catch (error: any) {
-      console.error('Get meals by date error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to fetch meals',
-        error: error.message
-      });
-    }
-  }
-
-  // Get meals by date range
-  static async getMealsByDateRange(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { startDate, endDate } = req.params;
-      const meals = await MealService.getUserMealsByDateRange(userId, startDate, endDate);
-      
-      res.json({
-        success: true,
-        startDate,
-        endDate,
-        meals,
-        count: meals.length
-      });
-    } catch (error: any) {
-      console.error('Get meals by date range error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to fetch meals',
-        error: error.message
-      });
-    }
-  }
-
-  // Add food to meal
-  static async addFoodToMeal(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { mealId } = req.params;
-      const foodData = req.body;
-      
-      await MealService.addFoodToMeal(userId, mealId, foodData);
-      
-      res.status(201).json({
-        success: true,
-        message: 'Food added to meal successfully'
-      });
-    } catch (error: any) {
-      console.error('Add food to meal error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to add food to meal',
-        error: error.message
-      });
-    }
-  }
-
-  // Update meal food
-  static async updateMealFood(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { mealFoodId } = req.params;
-      const updateData = req.body;
-      
-      await MealService.updateMealFood(userId, mealFoodId, updateData);
-      
-      res.json({
-        success: true,
-        message: 'Meal food updated successfully'
-      });
-    } catch (error: any) {
-      console.error('Update meal food error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to update meal food',
-        error: error.message
-      });
-    }
-  }
-
-  // Remove food from meal
-  static async removeFoodFromMeal(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { mealFoodId } = req.params;
-      await MealService.removeFoodFromMeal(userId, mealFoodId);
-      
-      res.json({
-        success: true,
-        message: 'Food removed from meal successfully'
-      });
-    } catch (error: any) {
-      console.error('Remove food from meal error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to remove food from meal',
-        error: error.message
-      });
-    }
-  }
-
-  // Get daily nutrition
-  static async getDailyNutrition(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { date } = req.params;
-      const nutrition = await MealService.getDailyNutrition(userId, date);
-      
-      res.json({
-        success: true,
-        nutrition
-      });
-    } catch (error: any) {
-      console.error('Get daily nutrition error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to fetch daily nutrition',
-        error: error.message
-      });
-    }
-  }
-
-  // Get nutrition summary for date range
-  static async getNutritionSummary(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { startDate, endDate } = req.params;
-      const nutrition = await MealService.getNutritionSummary(userId, startDate, endDate);
-      
-      res.json({
-        success: true,
-        startDate,
-        endDate,
-        nutrition
-      });
-    } catch (error: any) {
-      console.error('Get nutrition summary error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to fetch nutrition summary',
-        error: error.message
-      });
-    }
-  }
-
-  // Analyze meal nutrition
-  static async analyzeMealNutrition(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const { mealId } = req.params;
-      const analysis = await MealService.analyzeMealNutrition(userId, mealId);
-      
-      res.json({
-        success: true,
-        analysis
-      });
-    } catch (error: any) {
-      console.error('Analyze meal nutrition error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to analyze meal nutrition',
-        error: error.message
-      });
-    }
-  }
-
-  // Get meal recommendations
-  static async getMealRecommendations(req: AuthRequest, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ 
-          success: false,
-          message: 'User not authenticated' 
-        });
-      }
-
-      const criteria = req.body;
-      const recommendations = await MealService.recommendMeals(userId, criteria);
-      
-      res.json({
-        success: true,
-        recommendations,
-        count: recommendations.length
-      });
-    } catch (error: any) {
-      console.error('Get meal recommendations error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to get meal recommendations',
-        error: error.message
+        message: error?.message || 'Không thể tải danh sách món ăn mẫu',
       });
     }
   }
