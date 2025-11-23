@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/authenticate';
 import { ExerciseService } from '../services/ExerciseService';
+import { exerciseTemplates } from '../data/exerciseTemplates';
+import type { CreateExercisePayload } from '../models/Exercise';
 
 export class ExerciseController {
   // Health check
@@ -26,6 +28,73 @@ export class ExerciseController {
         'GET /exercises/popular'
       ]
     });
+  }
+
+  static async getExerciseTemplates(_req: AuthRequest, res: Response) {
+    res.json({
+      success: true,
+      templates: exerciseTemplates
+    });
+  }
+
+  static async createExerciseSession(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const {
+        exercise_name,
+        date,
+        start_time,
+        duration_minutes,
+        calories_burned,
+        notes,
+        intensity,
+        exercise_type,
+        template_id
+      } = req.body;
+
+      if (!exercise_name || !date) {
+        return res.status(400).json({
+          success: false,
+          message: 'exercise_name và date là bắt buộc'
+        });
+      }
+
+      const template = template_id
+        ? exerciseTemplates.find((tpl) => tpl.template_id === template_id)
+        : null;
+
+      const payload: CreateExercisePayload = {
+        exercise_name,
+        exercise_type: (exercise_type || template?.exercise_type || 'Other') as any,
+        intensity: (intensity || template?.intensity || 'Medium') as any,
+        exercise_date: date,
+        exercise_time: start_time || null,
+        duration_minutes: duration_minutes ?? template?.default_duration ?? null,
+        calories_burned: calories_burned ?? template?.default_calories ?? null,
+        notes: notes || template?.description || null,
+        is_completed: true
+      };
+
+      const exercise = await ExerciseService.createExercise(userId, payload);
+      res.status(201).json({
+        success: true,
+        session: exercise
+      });
+    } catch (error: any) {
+      console.error('Create exercise session error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Failed to create exercise session',
+        error: error.message
+      });
+    }
   }
 
   // Create new exercise
@@ -317,6 +386,33 @@ export class ExerciseController {
   }
 
   // Get daily exercise summary
+  static async getDailyExerciseSummaryByQuery(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const date = (req.query?.date as string) || new Date().toISOString().slice(0, 10);
+      const summary = await ExerciseService.getDailyExerciseSummary(userId, date);
+
+      res.json({
+        success: true,
+        summary
+      });
+    } catch (error: any) {
+      console.error('Get daily exercise summary (query) error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Failed to fetch daily exercise summary',
+        error: error.message
+      });
+    }
+  }
+
   static async getDailyExerciseSummary(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;

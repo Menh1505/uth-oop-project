@@ -8,6 +8,9 @@ const router = Router();
 router.get('/status', ExerciseController.status);
 
 // Exercise CRUD routes (all require auth)
+router.get('/templates', ExerciseController.getExerciseTemplates);
+router.post('/sessions', authenticate, ExerciseController.createExerciseSession);
+
 router.post('/', authenticate, ExerciseController.createExercise);
 router.get('/:exerciseId', authenticate, ExerciseController.getExercise);
 router.put('/:exerciseId', authenticate, ExerciseController.updateExercise);
@@ -20,6 +23,7 @@ router.get('/range/:startDate/:endDate', authenticate, ExerciseController.getExe
 
 // Exercise analytics routes
 router.get('/statistics/user', authenticate, ExerciseController.getExerciseStatistics);
+router.get('/summary/daily', authenticate, ExerciseController.getDailyExerciseSummaryByQuery);
 router.get('/summary/daily/:date', authenticate, ExerciseController.getDailyExerciseSummary);
 router.get('/performance/:exerciseName', authenticate, ExerciseController.getExercisePerformanceMetrics);
 

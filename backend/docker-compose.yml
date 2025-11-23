@@ -33,6 +33,25 @@ services:
     networks:
       - backend
 
+  exercise-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: fitfood_exercise_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - exercise_db_data:/var/lib/postgresql/data
+      - ./exercise-service/scripts:/docker-entrypoint-initdb.d:ro
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ==========================
   # RabbitMQ
   # ==========================
@@ -66,6 +85,7 @@ services:
       - user-service
       - goal-service
       - admin-service
+      - exercise-service
     networks:
       - backend
     restart: unless-stopped
@@ -127,18 +147,25 @@ services:
       - backend
 
   # exercise-service:
-  #   build: ./exercise-service
-  #   expose:
-  #     - "3005"
-  #   environment:
-  #     MONGODB_URI: mongodb://admin:uth@mongodb:27017/fitfood_exercise_db?authSource=admin
-  #     PORT: 3005
-  #     JWT_SECRET: shared-secret
-  #   depends_on:
-  #     - mongodb
-  #     - rabbitmq
-  #   networks:
-  #     - backend
+  exercise-service:
+    build: ./exercise-service
+    expose:
+      - "3005"
+    ports:
+      - "3005:3005"
+    environment:
+      PORT: 3005
+      DB_HOST: exercise-db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password
+      DB_NAME: fitfood_exercise_db
+      JWT_SECRET: shared-secret
+    depends_on:
+      exercise-db:
+        condition: service_healthy
+    networks:
+      - backend
 
   goal-service:
     build: ./goal-service
@@ -176,3 +203,4 @@ volumes:
   mongodb_data:
   rabbitmq_data:
   redis_data:
+  exercise_db_data:

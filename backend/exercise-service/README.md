@@ -192,7 +192,14 @@ POST /exercises/recommendations
 GET /exercises/popular/list?limit=10&period=month
 ```
 
-#### 13. Ước tính lượng calo
+#### 13. API template và session nhanh
+```
+GET /exercises/templates
+POST /exercises/sessions
+GET /exercises/summary/daily?date=2024-01-15
+```
+
+#### 14. Ước tính lượng calo
 ```
 POST /exercises/calories/estimate
 ```
@@ -219,17 +226,25 @@ Tạo file `.env`:
 PORT=3005
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=fitness_db
-DB_USER=fitness_user
-DB_PASSWORD=fitness_pass
-JWT_SECRET=your-secret-key
-RABBITMQ_URL=amqp://localhost:5672
+DB_NAME=fitfood_exercise_db
+DB_USER=postgres
+DB_PASSWORD=password
+JWT_SECRET=shared-secret
 ```
 
-### 3. Chạy migrations
+> JWT secret nên trùng với `auth-service` để token có thể verify giữa các service.
+
+### 3. Chuẩn bị database
+Service sử dụng PostgreSQL. Có thể chạy nhanh bằng Docker:
 ```bash
-# Từ thư mục backend root
-./run-migrations.sh
+docker compose -f ../docker-compose.yml up -d exercise-db
+```
+Script `scripts/001_init.sql` sẽ tự tạo bảng `exercises`.
+
+Nếu bạn đã tạo bảng trước khi cập nhật này, hãy chạy migration:
+```bash
+docker compose exec exercise-db psql -U postgres -d fitfood_exercise_db \
+  -f /docker-entrypoint-initdb.d/migrations/002_alter_exercises_user_id.sql
 ```
 
 ### 4. Khởi chạy service
@@ -245,11 +260,12 @@ npm run build
 npm start
 ```
 
-### 5. Chạy với Docker
+### 5. Chạy với Docker Compose
 ```bash
-docker build -t exercise-service .
-docker run -p 3005:3005 exercise-service
+cd backend
+docker compose up -d exercise-service nginx
 ```
+Lệnh trên sẽ khởi động Postgres (`exercise-db`), Exercise Service và gắn route `/api/exercises/*` qua Nginx (cổng 3000).
 
 ## Testing
 
@@ -277,6 +293,21 @@ curl -X POST http://localhost:3005/exercises \
 # Lấy thống kê
 curl http://localhost:3005/exercises/statistics/user \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Lấy templates
+curl http://localhost:3005/exercises/templates
+
+# Tạo buổi tập nhanh từ template
+curl -X POST http://localhost:3005/exercises/sessions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "exercise_name": "HIIT 15 phút",
+    "date": "2024-12-24",
+    "start_time": "07:30",
+    "duration_minutes": 15,
+    "template_id": "tpl-hiit-15"
+  }'
 ```
 
 ## Thuật toán đề xuất

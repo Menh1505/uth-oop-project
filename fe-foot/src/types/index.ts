@@ -575,8 +575,10 @@ export type ExerciseTemplate = {
   description?: string | null;
   muscle_group?: string | null;
   intensity?: string | null;
+  exercise_type?: string | null;
   default_duration?: number | null;
   default_calories?: number | null;
+  instructions?: string[] | null;
 };
 
 export type ExerciseSession = {

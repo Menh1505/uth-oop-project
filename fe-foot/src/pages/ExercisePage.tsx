@@ -127,6 +127,9 @@ export default function ExercisePage() {
       showToast({ type: "error", message: "Thông tin buổi tập chưa hợp lệ" });
       return;
     }
+    const template =
+      formState.templateId &&
+      templates.find((tpl) => tpl.id === formState.templateId);
 
     setSubmitting(true);
     try {
@@ -138,6 +141,8 @@ export default function ExercisePage() {
         calories_burned: formState.calories,
         notes: formState.notes || undefined,
         template_id: formState.templateId || undefined,
+        intensity: template?.intensity || undefined,
+        exercise_type: template?.exercise_type || undefined,
       });
       showToast({ type: "success", message: "Đã ghi nhận buổi tập" });
       setSelectedDate(formState.date);

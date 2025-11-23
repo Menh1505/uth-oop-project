@@ -24,7 +24,12 @@ export default function ExerciseSummary({
     status === "Tốt"
       ? "bg-green-100 text-green-700"
       : "bg-orange-100 text-orange-700";
-  const progress = Math.min(100, (totalCalories / CALORIES_TARGET) * 100);
+  const progressRatio = Math.min(1, totalCalories / CALORIES_TARGET);
+  const progressPercent = loading ? 0 : progressRatio * 100;
+  const displayPercent =
+    progressPercent > 0 && progressPercent < 4
+      ? 4
+      : Math.min(100, progressPercent);
 
   return (
     <Card title="Tổng quan buổi tập trong ngày">
@@ -56,10 +61,12 @@ export default function ExerciseSummary({
               {totalCalories}/{CALORIES_TARGET} kcal
             </span>
           </div>
-          <div className="mt-2 h-2 rounded-full bg-slate-100">
+          <div className="mt-2 h-2 rounded-full bg-slate-200">
             <div
-              className={`h-2 rounded-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all`}
-              style={{ width: `${loading ? 0 : progress}%` }}
+              className="h-2 rounded-full bg-gradient-to-r from-rose-400 via-orange-400 to-amber-400 transition-all"
+              style={{
+                width: `${displayPercent}%`,
+              }}
             />
           </div>
         </div>
