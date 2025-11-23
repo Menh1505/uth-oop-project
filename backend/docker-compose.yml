@@ -176,6 +176,7 @@ services:
       PORT: 3004
       JWT_SECRET: shared-secret
       USER_SERVICE_URL: http://user-service:3002
+      GOAL_SERVICE_URL: http://goal-service:3006
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: gpt-3.5-turbo
       MAX_TOKENS: 500
@@ -189,6 +190,7 @@ services:
       - mongodb
       - rabbitmq
       - user-service
+      - goal-service
     networks:
       - backend
 

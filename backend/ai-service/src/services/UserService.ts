@@ -5,6 +5,7 @@ import { IUser, IUserGoal } from '../types/index.js';
 
 export class UserService {
   private static baseUrl = aiConfig.userServiceUrl;
+  private static goalServiceUrl = process.env.GOAL_SERVICE_URL || 'http://goal-service:3006';
 
   static async getUserProfile(userId: string, token: string): Promise<IUser> {
     try {
@@ -43,7 +44,8 @@ export class UserService {
     try {
       logger.info(`Fetching user goals for: ${userId}`);
       
-      const response = await axios.get(`${this.baseUrl}/users/goals`, {
+      // Request to goal-service instead of user-service
+      const response = await axios.get(`${this.goalServiceUrl}/goals/user-goals`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -55,7 +57,7 @@ export class UserService {
         throw new Error(response.data.message || 'Failed to fetch user goals');
       }
 
-      return response.data.activeGoals || [];
+      return response.data.userGoals || [];
     } catch (error: any) {
       logger.error('Failed to fetch user goals', {
         error: error.message,
@@ -66,6 +68,12 @@ export class UserService {
       
       if (error.response?.status === 401) {
         throw new Error('Unauthorized: Invalid token');
+      }
+      
+      if (error.response?.status === 404) {
+        // User might not have any goals yet, return empty array
+        logger.info('No goals found for user, returning empty array', { userId });
+        return [];
       }
       
       throw new Error(`Failed to fetch user goals: ${error.message}`);
