@@ -21,14 +21,15 @@ interface UserData {
 }
 
 interface UserGoalSummary {
-  user_goal_id: string;
-  goal_type: string;
-  description?: string | null;
-  target_calories?: number | null;
-  target_weight?: number | null;
-  target_duration_weeks?: number | null;
-  progress_percentage: number;
-  status: string;
+  goal_id: string;
+  loai_muc_tieu: string;
+  can_nang_hien_tai: number;
+  can_nang_muc_tieu: number;
+  tong_calo_moi_ngay: number;
+  so_gio_tap_moi_ngay: number;
+  thoi_gian_dat_muc_tieu: number;
+  tien_trinh: number;
+  trang_thai: string;
 }
 
 export default function ProfilePage() {
@@ -73,25 +74,14 @@ export default function ProfilePage() {
     try {
       setGoalLoading(true);
       setGoalError(null);
-      const res: any = await ApiClient.get(
-        "/goals/user-goals?limit=1&status=Active"
-      );
+      const res: any = await ApiClient.get("/goals/me");
       const payload = res?.data || res;
-      const first = payload?.goals?.[0];
-      if (first && first.goal) {
-        setUserGoal({
-          user_goal_id: first.user_goal_id,
-          goal_type: first.goal.goal_type || "Goal",
-          description: first.goal.description || null,
-          target_calories: first.goal.target_calories ?? null,
-          target_weight: first.goal.target_weight ?? null,
-          target_duration_weeks: first.goal.target_duration_weeks ?? null,
-          progress_percentage: first.progress_percentage ?? 0,
-          status: first.status || "Active",
-        });
-      } else {
-        setUserGoal(null);
-      }
+      const goals = Array.isArray(payload?.goals)
+        ? payload.goals
+        : Array.isArray(payload)
+        ? payload
+        : [];
+      setUserGoal(goals[0] || null);
     } catch (e: any) {
       console.error("Failed to fetch user goals:", e);
       setGoalError(e?.message || "Không thể tải mục tiêu");
@@ -103,17 +93,13 @@ export default function ProfilePage() {
   useEffect(() => {
     if (userGoal) {
       setGoalSetupWeight(
-        typeof userGoal.target_weight === "number"
-          ? userGoal.target_weight
-          : userGoal.target_weight
-          ? Number(userGoal.target_weight)
+        typeof userGoal.can_nang_muc_tieu === "number"
+          ? userGoal.can_nang_muc_tieu
+          : userGoal.can_nang_muc_tieu
+          ? Number(userGoal.can_nang_muc_tieu)
           : null
       );
-      setGoalSetupDuration(
-        typeof userGoal.target_duration_weeks === "number"
-          ? userGoal.target_duration_weeks
-          : 8
-      );
+      setGoalSetupDuration(userGoal.thoi_gian_dat_muc_tieu ?? 8);
     } else {
       setGoalSetupWeight(null);
       setGoalSetupDuration(8);
@@ -122,15 +108,15 @@ export default function ProfilePage() {
 
   const openGoalSetup = () => {
     setGoalSetupWeight(
-      typeof userGoal?.target_weight === "number"
-        ? userGoal.target_weight
-        : userGoal?.target_weight
-        ? Number(userGoal.target_weight)
+      typeof userGoal?.can_nang_muc_tieu === "number"
+        ? userGoal.can_nang_muc_tieu
+        : userGoal?.can_nang_muc_tieu
+        ? Number(userGoal.can_nang_muc_tieu)
         : userData?.weight || 60
     );
     setGoalSetupDuration(
-      typeof userGoal?.target_duration_weeks === "number"
-        ? userGoal.target_duration_weeks
+      typeof userGoal?.thoi_gian_dat_muc_tieu === "number"
+        ? userGoal.thoi_gian_dat_muc_tieu
         : 8
     );
     setGoalSetupVisible(true);
@@ -140,7 +126,7 @@ export default function ProfilePage() {
 
   const adjustWeight = (delta: number) => {
     setGoalSetupWeight((prev) => {
-      const base = prev ?? userGoal?.target_weight ?? userData?.weight ?? 60;
+    const base = prev ?? userGoal?.can_nang_muc_tieu ?? userData?.weight ?? 60;
       const next = Math.min(
         200,
         Math.max(30, Number((base + delta).toFixed(1)))
@@ -158,8 +144,8 @@ export default function ProfilePage() {
       prev
         ? {
             ...prev,
-            target_weight: goalSetupWeight ?? prev.target_weight,
-            target_duration_weeks: goalSetupDuration,
+            can_nang_muc_tieu: goalSetupWeight ?? prev.can_nang_muc_tieu,
+            thoi_gian_dat_muc_tieu: goalSetupDuration,
           }
         : prev
     );
@@ -168,39 +154,38 @@ export default function ProfilePage() {
 
   const handleAddGoal = async () => {
     try {
-      const goalType = window.prompt(
-        "Nhập loại mục tiêu (vd: Reduce Fat, Build Muscle)",
-        "Reduce Fat"
+      const loai =
+        window.prompt(
+          "Nhập loại mục tiêu (Giảm cân, Tăng cân, Giữ dáng, Tăng cơ)",
+          "Giảm cân"
+        )?.trim() || "";
+      if (!loai) return;
+      const currentWeightStr = window.prompt(
+        "Nhập cân nặng hiện tại (kg)",
+        userData?.weight ? String(userData.weight) : "65"
       );
-      if (!goalType) return;
       const targetWeightStr = window.prompt(
         "Nhập cân nặng mục tiêu (kg)",
-        "65"
+        userData?.weight ? String(Number(userData.weight) - 3) : "60"
       );
-      const targetWeight = targetWeightStr
-        ? parseFloat(targetWeightStr)
-        : undefined;
-
-      const createPayload: any = {
-        goal_type: goalType,
-        description: "Mục tiêu cá nhân từ Profile",
-        target_weight: targetWeight,
-        target_duration_weeks: 8,
-      };
-
-      const created: any = await ApiClient.post("/goals", createPayload);
-      const createdGoal = created?.data || created;
-      const goalId = createdGoal?.goal_id || createdGoal?.id;
-      if (!goalId) {
-        alert("Không tạo được goal mới");
+      const hoursStr = window.prompt(
+        "Số giờ tập mỗi ngày (0.5, 1, 1.5, 2)",
+        "1"
+      );
+      const weeksStr = window.prompt(
+        "Thời gian đạt mục tiêu (tuần)",
+        "8"
+      );
+      if (!currentWeightStr || !targetWeightStr || !hoursStr || !weeksStr)
         return;
-      }
 
-      const assignPayload = {
-        goal_id: goalId,
-        notes: "Mục tiêu được tạo từ trang hồ sơ",
-      };
-      await ApiClient.post("/goals/user-goals", assignPayload);
+      await ApiClient.post("/goals/", {
+        loai_muc_tieu: loai as any,
+        can_nang_hien_tai: parseFloat(currentWeightStr),
+        can_nang_muc_tieu: parseFloat(targetWeightStr),
+        so_gio_tap_moi_ngay: Number(hoursStr),
+        thoi_gian_dat_muc_tieu: parseInt(weeksStr, 10),
+      });
       await fetchUserGoal();
     } catch (e: any) {
       console.error("Add goal error:", e);
@@ -211,15 +196,18 @@ export default function ProfilePage() {
   const handleUpdateGoal = async () => {
     if (!userGoal) return;
     try {
-      const progressStr = window.prompt(
-        "Nhập tiến độ mới (%) cho mục tiêu hiện tại",
-        String(userGoal.progress_percentage || 0)
+      const status =
+        window.prompt(
+          "Nhập trạng thái mới (Đang thực hiện/Đã hoàn thành/Hủy bỏ)",
+          userGoal.trang_thai
+        ) || userGoal.trang_thai;
+      const hours = window.prompt(
+        "Nhập số giờ tập mỗi ngày (0.5, 1, 1.5, 2)",
+        String(userGoal.so_gio_tap_moi_ngay)
       );
-      if (!progressStr) return;
-      const progress = parseFloat(progressStr);
-      if (Number.isNaN(progress)) return;
-      await ApiClient.put(`/goals/user-goals/${userGoal.user_goal_id}`, {
-        progress_percentage: progress,
+      await ApiClient.put(`/goals/${userGoal.goal_id}`, {
+        trang_thai: status as any,
+        so_gio_tap_moi_ngay: hours ? Number(hours) : undefined,
       });
       await fetchUserGoal();
     } catch (e: any) {
@@ -232,7 +220,7 @@ export default function ProfilePage() {
     if (!userGoal) return;
     if (!window.confirm("Bạn chắc chắn muốn xóa mục tiêu này?")) return;
     try {
-      await ApiClient.delete(`/goals/user-goals/${userGoal.user_goal_id}`);
+      await ApiClient.delete(`/goals/${userGoal.goal_id}`);
       setUserGoal(null);
     } catch (e: any) {
       console.error("Delete goal error:", e);
@@ -576,9 +564,9 @@ export default function ProfilePage() {
                     Mục tiêu cá nhân
                   </h3>
                   {(!userGoal ||
-                    (userGoal.goal_type || "")
+                    (userGoal.loai_muc_tieu || '')
                       .toLowerCase()
-                      .includes("maintain")) && (
+                      .includes('giữ')) && (
                     <button
                       type="button"
                       onClick={openGoalSetup}
@@ -614,32 +602,29 @@ export default function ProfilePage() {
                       {userGoal ? (
                         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-3.5 py-3 space-y-1">
                           <div className="text-xs font-semibold tracking-wide text-slate-300 uppercase">
-                            {userGoal.goal_type}
+                            {userGoal.loai_muc_tieu}
                           </div>
-                          {userGoal.description && (
-                            <div className="text-sm text-slate-100">
-                              {userGoal.description}
-                            </div>
-                          )}
                           <div className="text-xs text-slate-400">
                             Tiến độ:{" "}
                             <span className="text-emerald-300 font-semibold">
-                              {Math.round(userGoal.progress_percentage)}%
+                              {Math.round(userGoal.tien_trinh)}%
                             </span>
-                            {userGoal.target_weight && (
-                              <span className="ml-2">
-                                · Cân nặng mục tiêu: {userGoal.target_weight} kg
-                              </span>
-                            )}
-                            {userGoal.target_duration_weeks && (
-                              <span className="ml-2">
-                                · Thời gian: {userGoal.target_duration_weeks}{" "}
-                                tuần
-                              </span>
-                            )}
+                            <span className="ml-2">
+                              · Cân nặng hiện tại: {userGoal.can_nang_hien_tai} kg
+                            </span>
+                            <span className="ml-2">
+                              · Mục tiêu: {userGoal.can_nang_muc_tieu} kg
+                            </span>
+                            <span className="ml-2">
+                              · Thời gian: {userGoal.thoi_gian_dat_muc_tieu} tuần
+                            </span>
                           </div>
                           <div className="text-xs text-slate-500">
-                            Trạng thái: {userGoal.status}
+                            Trạng thái: {userGoal.trang_thai}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            Đốt mỗi ngày: {userGoal.tong_calo_moi_ngay} kcal •{" "}
+                            {userGoal.so_gio_tap_moi_ngay} giờ tập
                           </div>
                         </div>
                       ) : (

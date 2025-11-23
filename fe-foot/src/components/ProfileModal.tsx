@@ -17,13 +17,15 @@ type CombinedProfile = UserProfile & {
 };
 
 interface UserGoalSummary {
-  user_goal_id: string;
-  goal_type: string;
-  description?: string | null;
-  target_weight?: number | null;
-  target_duration_weeks?: number | null;
-  progress_percentage: number;
-  status: string;
+  goal_id: string;
+  loai_muc_tieu: string;
+  can_nang_hien_tai: number;
+  can_nang_muc_tieu: number;
+  tong_calo_moi_ngay: number;
+  so_gio_tap_moi_ngay: number;
+  thoi_gian_dat_muc_tieu: number;
+  tien_trinh: number;
+  trang_thai: string;
 }
 
 interface ProfileModalProps {
@@ -76,28 +78,14 @@ export default function ProfileModal({
     setGoalLoading(true);
     setGoalError(null);
     try {
-      const res: any = await ApiClient.get(
-        "/goals/user-goals?limit=1&status=Active"
-      );
+      const res: any = await ApiClient.get("/goals/me");
       const payload = res?.data || res;
-      const first = payload?.goals?.[0];
-      if (first && first.goal) {
-        setUserGoal({
-          user_goal_id: first.user_goal_id,
-          goal_type: first.goal.goal_type || "Goal",
-          description: first.goal.description || null,
-          target_weight:
-            first.goal.target_weight === undefined ||
-            first.goal.target_weight === null
-              ? null
-              : Number(first.goal.target_weight),
-          target_duration_weeks: first.goal.target_duration_weeks ?? null,
-          progress_percentage: first.progress_percentage ?? 0,
-          status: first.status || "Active",
-        });
-      } else {
-        setUserGoal(null);
-      }
+      const goals = Array.isArray(payload?.goals)
+        ? payload.goals
+        : Array.isArray(payload)
+        ? payload
+        : [];
+      setUserGoal(goals[0] || null);
     } catch (err: any) {
       console.error("ProfileModal goals fetch failed:", err);
       setGoalError(err?.message || "Không thể tải mục tiêu");
@@ -161,100 +149,41 @@ export default function ProfileModal({
 
   const handleAddGoal = async () => {
     try {
-      const templatesRes: any = await ApiClient.get("/goals/templates/list");
-      const payload = templatesRes?.data || templatesRes;
-      const templates = Array.isArray(payload?.templates)
-        ? payload.templates
-        : Array.isArray(payload?.data)
-        ? payload.data
-        : Array.isArray(payload)
-        ? payload
-        : [];
+      const loai =
+        window.prompt(
+          "Nhập loại mục tiêu (Giảm cân, Tăng cân, Giữ dáng, Tăng cơ)",
+          "Giảm cân"
+        )?.trim() || "";
+      if (!loai) return;
 
-      if (!templates.length) {
-        alert("Hiện chưa có template mục tiêu để chọn.");
-        return;
-      }
-
-      const options = templates
-        .map(
-          (tpl: any, idx: number) =>
-            `${idx + 1}. ${tpl.template_name || tpl.goal_type} (${
-              tpl.template_id
-            })`
-        )
-        .join("\n");
-      const choice = window.prompt(
-        `Chọn template mục tiêu (nhập số thứ tự hoặc template_id):\n${options}`
+      const currentWeight = window.prompt(
+        "Nhập cân nặng hiện tại (kg)",
+        serverProfile?.weight ? String(serverProfile.weight) : "65"
       );
-      if (!choice) return;
-
-      let selected: any = null;
-      const idx = parseInt(choice, 10);
-      if (!Number.isNaN(idx) && idx >= 1 && idx <= templates.length) {
-        selected = templates[idx - 1];
-      } else {
-        selected = templates.find(
-          (tpl: any) =>
-            (tpl.template_id || "").toLowerCase() ===
-            choice.trim().toLowerCase()
-        );
-      }
-
-      if (!selected?.template_id) {
-        alert("Không tìm thấy template tương ứng.");
-        return;
-      }
-
-      const defaultWeight =
-        userGoal?.target_weight ??
-        selected?.default_metrics?.weight ??
-        (serverProfile?.weight ? Number(serverProfile.weight) : undefined);
-      const defaultDuration =
-        userGoal?.target_duration_weeks ??
-        selected?.default_metrics?.duration_weeks ??
-        8;
-
-      const customizations: Record<string, number> = {};
-      if (defaultWeight !== undefined) {
-        const weightStr = window.prompt(
-          "Nhập cân nặng mục tiêu (kg)",
-          String(defaultWeight)
-        );
-        if (weightStr) {
-          const parsedWeight = parseFloat(weightStr);
-          if (!Number.isNaN(parsedWeight)) {
-            customizations.weight = parsedWeight;
-          }
-        }
-      }
-      const durationStr = window.prompt(
-        "Nhập thời gian mục tiêu (tuần)",
-        String(defaultDuration)
+      const targetWeight = window.prompt(
+        "Nhập cân nặng mục tiêu (kg)",
+        serverProfile?.weight ? String(Number(serverProfile.weight) - 3) : "60"
       );
-      if (durationStr) {
-        const parsedDuration = parseInt(durationStr, 10);
-        if (!Number.isNaN(parsedDuration)) {
-          customizations.duration_weeks = parsedDuration;
-        }
-      }
-
-      const createRes: any = await ApiClient.post(
-        `/goals/templates/${selected.template_id}/create`,
-        Object.keys(customizations).length ? { customizations } : {}
+      const hours = window.prompt(
+        "Số giờ tập mỗi ngày (0.5, 1, 1.5, 2)",
+        "1"
+      );
+      const weeks = window.prompt(
+        "Thời gian đạt mục tiêu (tuần)",
+        "8"
       );
 
-      const createdGoal = createRes?.data || createRes;
-      const goalId = createdGoal?.goal_id || createdGoal?.id;
-      if (!goalId) {
-        alert("Không tạo được goal từ template.");
-        return;
-      }
+      if (!currentWeight || !targetWeight || !hours || !weeks) return;
 
-      await ApiClient.post("/goals/user-goals", {
-        goal_id: goalId,
-        notes: `Từ template ${selected.template_name || selected.template_id}`,
-      });
+      const body = {
+        loai_muc_tieu: loai as any,
+        can_nang_hien_tai: parseFloat(currentWeight),
+        can_nang_muc_tieu: parseFloat(targetWeight),
+        so_gio_tap_moi_ngay: Number(hours) as any,
+        thoi_gian_dat_muc_tieu: parseInt(weeks, 10),
+      };
+
+      await ApiClient.post("/goals/", body);
       await fetchUserGoal();
     } catch (err: any) {
       console.error("Add goal error:", err);
@@ -264,16 +193,19 @@ export default function ProfileModal({
 
   const handleUpdateGoal = async () => {
     if (!userGoal) return;
-    const progressStr = window.prompt(
-      "Nhập tiến độ mới (%) cho mục tiêu",
-      String(userGoal.progress_percentage || 0)
-    );
-    if (!progressStr) return;
-    const progress = parseFloat(progressStr);
-    if (Number.isNaN(progress)) return;
     try {
-      await ApiClient.put(`/goals/user-goals/${userGoal.user_goal_id}`, {
-        progress_percentage: progress,
+      const status =
+        window.prompt(
+          "Nhập trạng thái mới (Đang thực hiện/Đã hoàn thành/Hủy bỏ)",
+          userGoal.trang_thai
+        ) || userGoal.trang_thai;
+      const hours = window.prompt(
+        "Số giờ tập mỗi ngày (0.5, 1, 1.5, 2)",
+        String(userGoal.so_gio_tap_moi_ngay)
+      );
+      await ApiClient.put(`/goals/${userGoal.goal_id}`, {
+        trang_thai: status as any,
+        so_gio_tap_moi_ngay: hours ? Number(hours) : undefined,
       });
       await fetchUserGoal();
     } catch (err: any) {
@@ -285,7 +217,7 @@ export default function ProfileModal({
     if (!userGoal) return;
     if (!window.confirm("Bạn chắc chắn muốn xóa mục tiêu này?")) return;
     try {
-      await ApiClient.delete(`/goals/user-goals/${userGoal.user_goal_id}`);
+      await ApiClient.delete(`/goals/${userGoal.goal_id}`);
       setUserGoal(null);
     } catch (err: any) {
       alert(err?.message || "Không thể xóa mục tiêu");
@@ -419,26 +351,27 @@ export default function ProfileModal({
                   ) : userGoal ? (
                     <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5 grid gap-1 text-xs">
                       <div className="flex items-center justify-between font-semibold uppercase text-emerald-200 tracking-wide">
-                        <span>{userGoal.goal_type}</span>
-                        <span>{Math.round(userGoal.progress_percentage)}%</span>
+                        <span>{userGoal.loai_muc_tieu}</span>
+                        <span>{Math.round(userGoal.tien_trinh)}%</span>
                       </div>
-                      {userGoal.description && (
-                        <div className="text-xs text-slate-200 line-clamp-2">
-                          {userGoal.description}
-                        </div>
-                      )}
+                      <div className="text-xs text-slate-200">
+                        Hiện tại: {userGoal.can_nang_hien_tai} kg • Mục tiêu:{" "}
+                        {userGoal.can_nang_muc_tieu} kg
+                      </div>
                       <div className="text-[10px] text-slate-400 flex flex-wrap gap-2">
-                        {userGoal.target_weight && (
-                          <span>Cân nặng: {userGoal.target_weight} kg</span>
-                        )}
-                        {userGoal.target_duration_weeks && (
+                        {userGoal.can_nang_muc_tieu && (
                           <span>
-                            Thời gian: {userGoal.target_duration_weeks} tuần
+                            Cân nặng mục tiêu: {userGoal.can_nang_muc_tieu} kg
+                          </span>
+                        )}
+                        {userGoal.thoi_gian_dat_muc_tieu && (
+                          <span>
+                            Thời gian: {userGoal.thoi_gian_dat_muc_tieu} tuần
                           </span>
                         )}
                       </div>
                       <div className="text-[10px] text-slate-500">
-                        Trạng thái: {userGoal.status}
+                        Trạng thái: {userGoal.trang_thai}
                       </div>
                     </div>
                   ) : (

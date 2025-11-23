@@ -1,49 +1,18 @@
 import { Router } from 'express';
 import { GoalController } from '../controllers/GoalController';
+import { UserTargetGoalController } from '../controllers/UserTargetGoalController';
 import { authenticate } from '../middleware/authenticate';
 
 const router = Router();
 const goalController = new GoalController();
+const userTargetGoalController = new UserTargetGoalController();
 
-// =================== Goal Management Routes ===================
+// =================== User Target Goal Routes ===================
 
-/**
- * @route POST /goals
- * @description Create a new goal
- * @access Private (Admin/Staff)
- * @body {CreateGoalRequest}
- */
-router.post('/', authenticate, goalController.createGoal);
-
-/**
- * @route GET /goals
- * @description List all goals
- * @access Private
- */
-router.get('/', authenticate, goalController.getGoals);
-
-/**
- * @route PUT /goals/:goalId
- * @description Update goal
- * @access Private (Admin/Staff)
- * @body {UpdateGoalRequest}
- */
-router.put('/:goalId', authenticate, goalController.updateGoal);
-
-/**
- * @route DELETE /goals/:goalId
- * @description Delete goal
- * @access Private (Admin/Staff)
- */
-router.delete('/:goalId', authenticate, goalController.deleteGoal);
-
-/**
- * @route GET /goals
- * @description Get all goals with filters and pagination
- * @access Public
- * @query goal_type, is_active, created_after, created_before, page, limit, sort_by, sort_order
- */
-router.get('/', goalController.getAllGoals);
+router.post('/', authenticate, userTargetGoalController.createGoal);
+router.get('/me', authenticate, userTargetGoalController.listMyGoals);
+router.put('/:goalId', authenticate, userTargetGoalController.updateGoal);
+router.delete('/:goalId', authenticate, userTargetGoalController.deleteGoal);
 
 /**
  * @route GET /goals/popular/list

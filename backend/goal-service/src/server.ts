@@ -56,11 +56,10 @@ const startServer = async () => {
     app.listen(PORT, () => {
       logger.info(`Goal service running on port ${PORT}`);
       logger.info('Available endpoints:');
-      logger.info('- POST /goals - Create goal (Admin)');
-      logger.info('- GET /goals/:goalId - Get goal details');
-      logger.info('- PUT /goals/:goalId - Update goal (Admin)');
-      logger.info('- DELETE /goals/:goalId - Delete goal (Admin)');
-      logger.info('- GET /goals - Get goals with filters');
+      logger.info('- POST /goals - Tạo mục tiêu cá nhân');
+      logger.info('- GET /goals/me - Xem mục tiêu của tôi');
+      logger.info('- PUT /goals/:goalId - Cập nhật mục tiêu cá nhân');
+      logger.info('- DELETE /goals/:goalId - Xoá mục tiêu cá nhân');
       logger.info('- GET /goals/popular/list - Get popular goals');
       logger.info('- POST /goals/user-goals - Assign goal to user');
       logger.info('- GET /goals/user-goals - Get user goals');
