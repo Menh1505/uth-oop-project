@@ -1,0 +1,50 @@
+@startuml NginxGatewayMap
+title Nginx API Gateway & Load Balancer Routing Map
+
+actor Client as Browser
+
+node "Nginx Gateway\nbackend/nginx/nginx.conf\nlisten :80" as Nginx {
+  component "Docker DNS resolver\n127.0.0.11" as DNS
+  component "Forward headers\nHost / X-Forwarded-*" as Headers
+}
+
+package "Frontend" as FrontendPkg {
+  component "fe-foot SPA\nReact @ /" as Frontend
+}
+
+package "Core Services (Docker network)" {
+  component "auth-service :3001\n/api/auth/* -> AuthController" as AuthSvc
+  component "user-service :3002\n/api/users/* -> UserController" as UserSvc
+  component "admin-service :3003\n/api/admin/* -> Admin APIs" as AdminSvc
+  component "meal-service :3004\n/api/meals/* -> meal routes" as MealSvc
+  component "exercise-service :3005\n/api/exercises/* -> workout routes" as ExSvc
+  component "goal-service :3006\n/api/goals/* -> goal routes" as GoalSvc
+}
+
+package "Future / disabled" {
+  component "recommendation-service :3007\nlocation commented" as RecSrv
+  component "payment-service :3008\nlocation commented" as PaySrv
+}
+
+Browser --> Frontend : HTTP UI routes
+Frontend --> Nginx : Fetch /api/*
+Browser --> Nginx : direct REST calls
+
+Nginx --> AuthSvc : proxy_pass http://auth-service:3001
+Nginx --> UserSvc : proxy_pass http://user-service:3002/users/
+Nginx --> AdminSvc : proxy_pass http://admin-service:3003/
+Nginx --> MealSvc : proxy_pass http://meal-service:3004/meals/
+Nginx --> ExSvc : proxy_pass http://exercise-service:3005/exercises/
+Nginx --> GoalSvc : proxy_pass http://goal-service:3006/goals/
+Nginx ..> RecSrv : rewrite/proxy disabled
+Nginx ..> PaySrv : rewrite/proxy disabled
+
+note bottom of Nginx
+  - Acts as single entry point and load balancer for all /api traffic.
+  - Rewrites /api/<svc>/* paths before proxy_pass to internal service routes.
+  - Forwards Host/X-Forwarded-* headers so downstream services see client context.
+  - Uses Docker DNS (127.0.0.11) so service names resolve on the overlay network.
+  - Exposes /health endpoint for monitoring and orchestrator checks.
+end note
+
+@enduml

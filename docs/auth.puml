@@ -1,0 +1,130 @@
+@startuml AuthLoginSequence
+title LCUS Email/Password Login Flow
+actor User as Browser
+participant "Login Page\nfe-foot/src/pages/auth/Login.tsx" as LoginPage
+participant "AppStore\nfe-foot/src/store/AppStore.tsx" as Store
+participant "API Gateway\n(Nginx /api proxy)" as Gateway
+participant "Auth Router\nuserCacheMiddleware + AuthController.login" as AuthAPI
+collections "Redis Cache\ncacheService.ts" as Redis
+participant "AuthService.login\nbackend/auth-service" as Service
+database "MongoDB\nusers & sessions" as Mongo
+queue "MessageService\nRabbitMQ exchange" as MQ
+participant "User Service\nGET /api/users/me" as UserSvc
+database "user_db\nprofiles" as UserDB
+
+User -> LoginPage: Enter username/email + password\nand click "Login"
+LoginPage -> Store: onSubmit -> login(username,password)
+Store -> Gateway: POST /api/auth/login { username, password }
+Gateway -> AuthAPI: Proxy request to auth-service
+AuthAPI -> Redis: userCacheMiddleware -> GET auth:user:<identifier>
+Redis --> AuthAPI: Cached payload (hit or miss)
+AuthAPI -> Service: AuthService.login(identifier,password)
+Service -> Mongo: User.findOne({ email|username, status: "active" })
+Mongo --> Service: user document or null
+alt Invalid user or password
+  Service --> AuthAPI: null
+  AuthAPI -> Gateway: 401 {"message": "Invalid credentials"}
+  Gateway --> Store: HTTP 401
+  Store -> LoginPage: setLoginError + show error toast
+else Successful login
+  Service -> Service: bcrypt.compare(password, user.password_hash)
+  Service -> Service: signAccess({ id, email, role })
+  Service -> Service: generateRefreshToken()
+  Service -> Mongo: Session.insertOne({ user_id, refresh_token_hash, expires_at, user_agent })
+  Service -> Redis: cacheAuthUser(email, { user, roles, cachedAt })
+  Service -> MQ: publish("user.logged_in", payload)
+  Service --> AuthAPI: { access_token, refresh_token, expires_at }
+  AuthAPI -> Gateway: Set-Cookie refresh_token=... (HttpOnly, SameSite=Lax, path=/auth)
+  Gateway --> Store: 200 + tokens JSON
+  Store -> Store: Persist access_token (authToken/accessToken)\nand refreshToken in localStorage
+  Store -> Gateway: GET /api/users/me (Authorization: Bearer access_token)
+  Gateway -> UserSvc: Forward request with JWT claims
+  UserSvc -> UserDB: Lookup profile by req.user.id
+  alt Profile exists
+    UserDB --> UserSvc: profile + needsOnboarding flag
+  else Missing profile
+    UserSvc -> UserDB: createUserWithEmail(id,email)
+    UserDB --> UserSvc: default profile + needsOnboarding=true
+  end
+  UserSvc --> Gateway: { success, user, needsOnboarding }
+  Gateway --> Store: profile payload
+  Store -> Store: setAuthed(true) + setProfile(...)
+  Store -> LoginPage: render authenticated experience
+end
+note right of Store
+  AppStore also owns logout, keeps refresh token in cookie,
+  and stores needsOnboarding/profile so screens know what to render.
+end note
+@enduml
+
+@startuml AuthEntities
+title Auth Service Entities (login/session domain)
+entity "User\nbackend/auth-service/src/models/User.ts" as User {
+  * _id : ObjectId
+  --
+  email : string (unique, lowercase)
+  username : string?
+  password_hash : string?
+  status : enum(active,inactive,suspended)
+  is_active : boolean
+  email_verified : boolean
+  login_methods : [email|google|facebook|apple]
+  google_id : string? (sparse unique)
+  google_email : string?
+  google_verified_at : Date?
+  last_login : Date?
+  profile_picture_url : string?
+  created_at : Date
+  updated_at : Date
+}
+
+entity "Session" as Session {
+  * _id : ObjectId
+  --
+  user_id : ObjectId (FK -> User)
+  refresh_token_hash : string (bcrypt)
+  user_agent : string?
+  ip : string?
+  login_method : enum
+  expires_at : Date
+  created_at : Date
+}
+
+entity "TokenBlacklist" as TokenBlacklist {
+  * _id : ObjectId
+  --
+  token_hash : string (unique bcrypt hash)
+  user_id : ObjectId?
+  expires_at : Date
+  blacklisted_at : Date
+}
+
+entity "Identity" as Identity {
+  * _id : ObjectId
+  --
+  user_id : ObjectId (FK -> User)
+  provider : string
+  provider_uid : string (unique)
+  meta : JSON
+  created_at : Date
+}
+
+entity "CachedAuthUserPayload\nRedis auth:user:<identifier>" as Cache {
+  identifier : lower(email|username)
+  user : User snapshot
+  roles : string[]
+  cachedAt : ISO string
+}
+
+entity "Auth Events\nMessageService -> RabbitMQ" as Events {
+  routingKey : user.registered/logged_in/logged_out
+  payload : { userId, email, role, provider?, timestamp, avatar? }
+}
+
+User ||--o{ Session : "1 .. N refresh sessions"
+User ||--o{ Identity : "1 .. N social identities"
+User ||--o{ TokenBlacklist : "Revoked access tokens"
+Cache .. User : "Denormalized cache entry"
+Events .. User : "Emits lifecycle events"
+Session .. TokenBlacklist : "Logout flow blacklists access token hash"
+@enduml

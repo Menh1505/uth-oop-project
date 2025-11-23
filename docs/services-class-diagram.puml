@@ -1,0 +1,236 @@
+@startuml ServicesClassDiagram
+title Core Service Class Diagram (Auth, User, Exercise, Meal)
+skinparam packageStyle rectangle
+
+package "Auth Service" {
+  class AuthController {
+    +register(req,res)
+    +login(req,res)
+    +googleLogin(req,res)
+    +refresh(req,res)
+    +logout(req,res)
+    +verify(req,res)
+  }
+  class AuthService {
+    +register(email,password,username?)
+    +login(emailOrUsername,password)
+    +loginWithGoogle(idToken)
+    +adminLogin(username,password)
+    +refresh(refreshToken,ua,ip)
+    +logout(accessToken,refreshToken?)
+    +listSessions()
+    +deleteSessionById(id)
+    +deleteOtherSessions(refresh?)
+    +listBlacklist()
+  }
+  class MessageService {
+    +publish(routingKey,message)
+    +close()
+  }
+  class UserModel {
+    +email
+    +username
+    +password_hash
+    +login_methods[]
+    +google_id
+    +status
+    +profile_picture_url
+  }
+  class SessionModel {
+    +user_id
+    +refresh_token_hash
+    +expires_at
+    +login_method
+  }
+  class TokenBlacklistModel {
+    +token_hash
+    +user_id
+    +expires_at
+  }
+  class IdentityModel {
+    +user_id
+    +provider
+    +provider_uid
+    +meta
+  }
+
+  AuthController --> AuthService
+  AuthService --> UserModel
+  AuthService --> SessionModel
+  AuthService --> TokenBlacklistModel
+  AuthService --> IdentityModel
+  AuthService --> MessageService
+}
+
+package "User Service" {
+  class UserController {
+    +status()
+    +register()
+    +login()
+    +getMe()
+    +updateMe()
+    +onboarding()
+    +goals CRUD
+    +avatar()
+  }
+  class UserService {
+    +registerUser(data)
+    +loginUser(credentials)
+    +getUserProfile(userId)
+    +updateUserProfile(userId,data)
+    +createUserWithEmail(userId,email)
+    +needsOnboarding(userId)
+    +goal management...
+  }
+  class UserProfileModel {
+    +user_id
+    +name
+    +email
+    +avatar_url
+    +goals[]
+    +nutrition_stats
+  }
+
+  UserController --> UserService
+  UserService --> UserProfileModel
+}
+
+package "Exercise Service" {
+  class ExerciseController {
+    +status()
+    +getExerciseTemplates()
+    +createExerciseSession()
+    +createExercise()
+    +getExercise()
+    +updateExercise()
+    +deleteExercise()
+    +listExercises()
+    +statistics()
+  }
+  class ExerciseService {
+    +createExercise(userId,payload)
+    +getExerciseById(userId,exerciseId)
+    +updateExercise(userId,exerciseId,data)
+    +deleteExercise(userId,exerciseId)
+    +listExercises(userId,filters)
+    +getDailySummary(userId,date)
+    +getStatistics(userId,range)
+    +recommendExercises(criteria)
+  }
+  class ExerciseModel {
+    +id
+    +user_id
+    +exercise_name
+    +exercise_type
+    +intensity
+    +duration_minutes
+    +calories_burned
+    +exercise_date
+    +notes
+  }
+
+  ExerciseController --> ExerciseService
+  ExerciseService --> ExerciseModel
+}
+
+package "Meal Service" {
+  class MealController {
+    +status()
+    +createMeal()
+    +getMeal()
+    +updateMeal()
+    +deleteMeal()
+    +listMeals()
+    +getDailySummary()
+  }
+  class MealService {
+    +createMeal(userId,payload)
+    +getMealById(userId,mealId)
+    +updateMeal(userId,mealId,data)
+    +deleteMeal(userId,mealId)
+    +listMeals(userId,date?)
+    +calculateSummary(userId,date)
+  }
+  class MealModel {
+    +id
+    +user_id
+    +meal_type
+    +items[]
+    +calories
+    +macros
+    +meal_date
+    +meal_time
+    +notes
+  }
+
+  MealController --> MealService
+  MealService --> MealModel
+}
+
+package "Goal Service" {
+  class GoalController {
+    +createGoal()
+    +getGoals()
+    +getGoalById()
+    +updateGoal()
+    +deleteGoal()
+    +assignGoalToUser()
+    +getUserGoals()
+    +updateUserGoal()
+    +goalProgress()
+    +recommendations()
+    +goalTemplates()
+  }
+  class GoalService {
+    +createGoal(data)
+    +getAllGoals(filters,pagination)
+    +getGoalById(goalId)
+    +updateGoal(goalId,data)
+    +deleteGoal(goalId)
+    +assignGoalToUser(userId,data)
+    +getUserGoals(userId,filters,pagination)
+    +getGoalProgress(userGoalId)
+    +updateGoalProgress(userGoalId,percent)
+    +getGoalRecommendations(userId)
+    +getGoalTemplates()
+    +createGoalFromTemplate(templateId,customizations)
+    +getSmartGoalSuggestions(userId)
+  }
+  class GoalModel {
+    +goal_id
+    +goal_type
+    +title
+    +description
+    +target_value
+    +unit
+    +difficulty
+    +is_active
+    +created_at
+    +updated_at
+  }
+  class UserGoalModel {
+    +user_goal_id
+    +user_id
+    +goal_id
+    +status
+    +progress_percentage
+    +target_completion_date
+    +notes
+    +created_at
+    +updated_at
+  }
+
+  GoalController --> GoalService
+  GoalService --> GoalModel
+  GoalService --> UserGoalModel
+}
+
+AuthService ..> UserService : share user events/cache
+UserService ..> MealService : consume meal summaries
+UserService ..> ExerciseService : consume exercise summaries
+UserService ..> GoalService : consume goal stats
+MealService ..> ExerciseService : cross reference stats
+MealService ..> GoalService : nutrition goals
+ExerciseService ..> GoalService : fitness goals
+
+@enduml

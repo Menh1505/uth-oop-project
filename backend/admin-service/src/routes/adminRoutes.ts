@@ -30,5 +30,7 @@ router.get('/system/health', AdminController.getServiceHealth);
 router.get('/users', AdminController.getUsers);
 router.delete('/users/:userId', AdminController.deleteUser);
 router.get('/stats', AdminController.getAdminStats);
+router.get('/sessions', AdminController.getAuthSessions);
+router.delete('/sessions/:sessionId', AdminController.deleteAuthSession);
 
 export default router;

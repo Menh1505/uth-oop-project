@@ -17,9 +17,21 @@ interface User {
   role: string;
 }
 
+interface Session {
+  _id: string;
+  user_id: string;
+  ip?: string;
+  user_agent?: string;
+  login_method?: string;
+  created_at: string;
+  expires_at: string;
+  current?: boolean;
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,13 +44,24 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
       
-      // Fetch stats
-      const statsData = await ApiClient.get<AdminStats>("/admin/stats");
+      const [statsData, usersData, sessionsData] = await Promise.all([
+        ApiClient.get<AdminStats>("/admin/stats"),
+        ApiClient.get<User[]>("/admin/users"),
+        ApiClient.get<{ items?: Session[] } | Session[]>("/admin/sessions"),
+      ]);
+
       setStats(statsData);
-      
-      // Fetch users
-      const usersData = await ApiClient.get<User[]>("/admin/users");
       setUsers(usersData || []);
+      const sessionList = Array.isArray((sessionsData as any)?.items)
+        ? ((sessionsData as { items?: Session[] }).items as Session[])
+        : Array.isArray(sessionsData)
+          ? (sessionsData as Session[])
+          : [];
+      const normalizedSessions: Session[] = sessionList.map((session: any) => ({
+        ...session,
+        user_id: normalizeUserId(session?.user_id),
+      }));
+      setSessions(normalizedSessions);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error loading data");
     } finally {
@@ -55,6 +78,42 @@ export default function AdminDashboard() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error deleting user");
     }
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    if (!confirm("Xóa phiên đăng nhập này?")) return;
+    try {
+      await ApiClient.delete(`/admin/sessions/${sessionId}`);
+      setSessions((prev) => prev.filter((session) => session._id !== sessionId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error deleting session");
+    }
+  };
+
+  const formatDate = (value?: string) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleString("vi-VN", {
+          hour12: false,
+        });
+  };
+
+  const normalizeUserId = (value: unknown): string => {
+    if (!value) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "object") {
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.$oid === "string") return obj.$oid;
+      if (typeof obj._id === "string") return obj._id;
+      if (typeof obj.id === "string") return obj.id;
+      if (typeof obj.toString === "function") {
+        const str = obj.toString();
+        if (str && str !== "[object Object]") return str;
+      }
+    }
+    return JSON.stringify(value);
   };
 
   if (loading)
@@ -120,6 +179,68 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+        </Card>
+
+        <Card title="Phiên đăng nhập">
+          {sessions.length === 0 ? (
+            <p className="text-sm text-slate-500">Chưa ghi nhận phiên đăng nhập nào.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Session</th>
+                    <th className="text-left p-2">User</th>
+                    <th className="text-left p-2">Phương thức</th>
+                    <th className="text-left p-2">IP</th>
+                    <th className="text-left p-2">Tạo lúc</th>
+                    <th className="text-left p-2">Hết hạn</th>
+                    <th className="text-left p-2">Trạng thái</th>
+                    <th className="text-left p-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map((session) => (
+                    <tr key={session._id} className="border-b">
+                      <td className="p-2 font-mono text-xs">
+                        {session._id.slice(0, 8)}…
+                      </td>
+                      <td className="p-2 text-xs">
+                        {typeof session.user_id === "string"
+                          ? session.user_id.slice(0, 12) + "…"
+                          : JSON.stringify(session.user_id)}
+                      </td>
+                      <td className="p-2 capitalize">
+                        {session.login_method || "email"}
+                      </td>
+                      <td className="p-2 text-xs">{session.ip || "—"}</td>
+                      <td className="p-2 text-xs">{formatDate(session.created_at)}</td>
+                      <td className="p-2 text-xs">{formatDate(session.expires_at)}</td>
+                      <td className="p-2">
+                        {session.current ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                            Hiện tại
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                            Khác
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <button
+                          onClick={() => deleteSession(session._id)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Card>
       </div>
     </AdminLayout>

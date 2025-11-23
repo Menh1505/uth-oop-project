@@ -190,6 +190,8 @@ services:
       JWT_SECRET: shared-secret
       USER_SERVICE_URL: http://user-service:3002
       AUTH_SERVICE_URL: http://auth-service:3001
+      USER_API_BASE_URL: http://nginx/api/users
+      AUTH_API_BASE_URL: http://nginx/api/auth
     depends_on:
       - mongodb
     networks:

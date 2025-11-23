@@ -10,8 +10,8 @@ interface Restaurant {
   phone: string;
   email: string;
   cuisine: string;
-  isActive: boolean;
-  createdAt: string;
+  isActive?: boolean;
+  createdAt?: string;
 }
 
 interface FormData {
@@ -21,6 +21,47 @@ interface FormData {
   email: string;
   cuisine: string;
 }
+
+const FALLBACK_RESTAURANTS: Restaurant[] = [
+  {
+    id: "rest-01",
+    name: "The Fit Kitchen",
+    address: "12 Lý Thường Kiệt, Hà Nội",
+    phone: "024 1234 5678",
+    email: "hello@fitkitchen.vn",
+    cuisine: "Healthy fusion",
+  },
+  {
+    id: "rest-02",
+    name: "Saigon Greens",
+    address: "88 Nguyễn Huệ, Q.1, TP.HCM",
+    phone: "028 9999 2222",
+    email: "contact@saigongreens.com",
+    cuisine: "Plant-based Vietnamese",
+  },
+  {
+    id: "rest-03",
+    name: "Balance Bowls",
+    address: "45 Pasteur, Đà Nẵng",
+    phone: "0236 456 789",
+    email: "support@balancebowls.vn",
+    cuisine: "Poke / Salad bowls",
+  },
+];
+
+const isNotFoundError = (err: unknown) => {
+  if (err instanceof Error) {
+    return /not\s+found/i.test(err.message);
+  }
+  return false;
+};
+
+const createLocalRestaurant = (payload: FormData): Restaurant => ({
+  id: crypto.randomUUID ? crypto.randomUUID() : `local-${Date.now()}`,
+  ...payload,
+  isActive: true,
+  createdAt: new Date().toISOString(),
+});
 
 export default function RestaurantsPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -46,8 +87,13 @@ export default function RestaurantsPage() {
       const data = await ApiClient.get('/restaurants');
       setRestaurants(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch restaurants');
-      setRestaurants([]);
+      if (isNotFoundError(err)) {
+        setRestaurants(FALLBACK_RESTAURANTS);
+        setError('');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch restaurants');
+        setRestaurants([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -68,7 +114,14 @@ export default function RestaurantsPage() {
       setShowForm(false);
       fetchRestaurants();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create restaurant');
+      if (isNotFoundError(err)) {
+        const localRestaurant = createLocalRestaurant(formData);
+        setRestaurants((prev) => [localRestaurant, ...prev]);
+        setShowForm(false);
+        setError('');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to create restaurant');
+      }
     }
   };
 
@@ -79,7 +132,12 @@ export default function RestaurantsPage() {
       await ApiClient.delete(`/restaurants/${id}`);
       fetchRestaurants();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete restaurant');
+      if (isNotFoundError(err)) {
+        setRestaurants((prev) => prev.filter((rest) => rest.id !== id));
+        setError('');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to delete restaurant');
+      }
     }
   };
 

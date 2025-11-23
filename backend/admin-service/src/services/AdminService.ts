@@ -59,7 +59,7 @@ export class AdminService {
 
   static async getUsersFromUserService(token: string): Promise<any[]> {
     try {
-      const response = await axios.get(`${serviceConfig.userServiceUrl}/api/users`, {
+      const response = await axios.get(`${serviceConfig.userApiBase}/admin/users`, {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 5000,
       });
@@ -72,7 +72,7 @@ export class AdminService {
 
   static async deleteUserFromUserService(userId: number, token: string): Promise<boolean> {
     try {
-      await axios.delete(`${serviceConfig.userServiceUrl}/api/users/${userId}`, {
+      await axios.delete(`${serviceConfig.userApiBase}/admin/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 5000,
       });
@@ -92,5 +92,34 @@ export class AdminService {
       activeUsers: users.length, // Assuming all users are active for now
       systemHealth,
     };
+  }
+
+  static async getAuthSessions(token?: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${serviceConfig.authApiBase}/sessions`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        timeout: 5000,
+      });
+      const body = response.data;
+      if (Array.isArray(body?.items)) return body.items;
+      if (Array.isArray(body)) return body;
+      return body?.data ?? [];
+    } catch (error) {
+      console.error('Failed to fetch sessions from auth service:', error);
+      return [];
+    }
+  }
+
+  static async deleteAuthSession(sessionId: string, token?: string): Promise<boolean> {
+    try {
+      await axios.delete(`${serviceConfig.authApiBase}/sessions/${sessionId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        timeout: 5000,
+      });
+      return true;
+    } catch (error) {
+      console.error(`Failed to delete session ${sessionId}:`, error);
+      return false;
+    }
   }
 }

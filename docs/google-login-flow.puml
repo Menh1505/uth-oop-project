@@ -1,0 +1,73 @@
+@startuml GoogleFirebaseLogin
+title Google / Firebase Login Sequence
+
+actor User
+participant "SPA Login UI\nGoogleLoginButton.tsx" as UI
+participant "Firebase Auth SDK\nsignInWithPopup()" as FirebaseSDK
+entity "Google Identity Provider" as GoogleID
+participant "ApiClient\nPOST /api/auth/google-login" as ApiClient
+participant "Nginx Gateway" as Gateway
+participant "AuthController.googleLogin" as AuthAPI
+participant "AuthService.loginWithGoogle" as AuthSvc
+database "MongoDB\nusers / sessions / identities" as Mongo
+queue "MessageService\nRabbitMQ exchange" as MQ
+participant "User Service\nGET /api/users/me" as UserSvc
+database "user_db\nprofiles" as UserDB
+
+== Obtain Firebase ID token ==
+User -> UI: Click "Dang nhap voi Google"
+UI -> FirebaseSDK: signInWithPopup(auth, googleProvider)
+FirebaseSDK -> GoogleID: OAuth consent + tokens
+GoogleID --> FirebaseSDK: Firebase user credential
+FirebaseSDK --> UI: FirebaseUser + getIdToken()
+UI -> UI: idToken = await user.getIdToken()
+
+== Exchange token with backend ==
+UI -> ApiClient: POST /auth/google-login { idToken }
+ApiClient -> Gateway: /api/auth/google-login
+Gateway -> AuthAPI: rewrite to auth-service:3001
+AuthAPI -> AuthSvc: loginWithGoogle(idToken)
+AuthSvc -> AuthSvc: verifyFirebaseIdToken(idToken)
+AuthSvc -> Mongo: User.findOne({ email })
+alt Existing user
+  Mongo --> AuthSvc: user document
+  AuthSvc -> AuthSvc: ensure login_methods has "google"
+else First time Google login
+  AuthSvc -> AuthSvc: random password + hash
+  AuthSvc -> Mongo: insert User(email, google fields, avatar)
+  AuthSvc -> MQ: publish user.registered
+end
+AuthSvc -> Mongo: upsert Identity { provider:"google", provider_uid }
+AuthSvc -> AuthSvc: signAccess() + generateRefreshToken()
+AuthSvc -> Mongo: insert Session { user_id, refresh_token_hash, login_method:"google" }
+AuthSvc -> MQ: publish user.logged_in (provider=google)
+AuthSvc --> AuthAPI: { access_token, refresh_token, expires_at, token_type }
+AuthAPI -> Gateway: Set-Cookie refresh_token=... (HttpOnly, SameSite=Lax, path=/auth)
+Gateway --> ApiClient: 200 + tokens JSON
+ApiClient --> UI: response payload
+
+== Persist client state ==
+UI -> UI: store access_token/authToken + refreshToken\nlocalStorage.loginMethod = "google"
+
+== Fetch profile & onboarding ==
+UI -> Gateway: GET /api/users/me (Authorization: Bearer access_token)
+Gateway -> UserSvc: forward request with JWT claims
+UserSvc -> UserDB: lookup profile by user_id
+alt Profile missing in user_db
+  UserDB --> UserSvc: not found
+  UserSvc -> UserDB: createUserWithEmail(user_id, email)
+  UserSvc --> Gateway: { success, user, needsOnboarding:true }
+else Profile exists
+  UserDB --> UserSvc: profile + onboarding flag
+  UserSvc --> Gateway: { success, user, needsOnboarding }
+end
+Gateway --> UI: profile payload
+UI -> UI: onSuccess({ tokens, profile, needsOnboarding })
+UI -> User: Navigate to onboarding or journal based on flag
+
+note over UI
+  UI stores loginMethod to keep routing consistent on reload,
+  and AppStore.completeOnboarding consumes profile payload.
+end note
+
+@enduml

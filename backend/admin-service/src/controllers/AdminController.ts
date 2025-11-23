@@ -77,6 +77,47 @@ export class AdminController {
     }
   }
 
+  static async getAuthSessions(req: AdminRequest, res: Response): Promise<void> {
+    try {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        res.status(401).json({ message: 'No token provided' });
+        return;
+      }
+
+      const sessions = await AdminService.getAuthSessions(token);
+      res.json({ items: sessions });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch sessions' });
+    }
+  }
+
+  static async deleteAuthSession(req: AdminRequest, res: Response): Promise<void> {
+    try {
+      const token = req.headers.authorization?.split(' ')[1];
+      if (!token) {
+        res.status(401).json({ message: 'No token provided' });
+        return;
+      }
+
+      const { sessionId } = req.params;
+      if (!sessionId) {
+        res.status(400).json({ message: 'Session ID is required' });
+        return;
+      }
+
+      const deleted = await AdminService.deleteAuthSession(sessionId, token);
+      if (!deleted) {
+        res.status(404).json({ message: 'Session not found or failed to delete' });
+        return;
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete session' });
+    }
+  }
+
   static async getDashboard(req: AdminRequest, res: Response): Promise<void> {
     try {
       const token = req.headers.authorization?.split(' ')[1];

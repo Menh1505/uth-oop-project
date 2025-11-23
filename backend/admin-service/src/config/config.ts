@@ -2,8 +2,20 @@ export const jwtConfig = {
   secret: process.env.JWT_SECRET || 'your-secret-key',
 };
 
+const trimTrailingSlash = (url?: string) =>
+  url ? url.replace(/\/+$/, '') : undefined;
+
+const fallbackUserService = 'http://user-service:3002';
+const fallbackAuthService = 'http://auth-service:3001';
+
 export const serviceConfig = {
   port: process.env.PORT || 3003,
-  userServiceUrl: process.env.USER_SERVICE_URL || 'http://localhost:3002',
-  authServiceUrl: process.env.AUTH_SERVICE_URL || 'http://localhost:3001',
+  userServiceUrl: trimTrailingSlash(process.env.USER_SERVICE_URL) || fallbackUserService,
+  authServiceUrl: trimTrailingSlash(process.env.AUTH_SERVICE_URL) || fallbackAuthService,
+  userApiBase:
+    trimTrailingSlash(process.env.USER_API_BASE_URL) ||
+    `${trimTrailingSlash(process.env.USER_SERVICE_URL) || fallbackUserService}/users`,
+  authApiBase:
+    trimTrailingSlash(process.env.AUTH_API_BASE_URL) ||
+    `${trimTrailingSlash(process.env.AUTH_SERVICE_URL) || fallbackAuthService}/auth`,
 };

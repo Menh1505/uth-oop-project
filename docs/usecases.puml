@@ -1,0 +1,78 @@
+@startuml SystemUseCases
+title LCUS Platform Use Cases
+
+left to right direction
+
+actor "Visitor" as Visitor
+actor "Authenticated User" as User
+actor "Admin" as Admin
+actor "Firebase Google IDP" as GoogleIDP
+
+package "Auth Service" {
+  usecase (Register with Email) as UC_Register
+  usecase (Login with Email/Password) as UC_Login
+  usecase (Login via Google) as UC_GoogleLogin
+  usecase (Refresh Session) as UC_Refresh
+  usecase (Manage Sessions) as UC_Sessions
+  usecase (Logout) as UC_Logout
+}
+
+package "User Service" {
+  usecase (View Profile) as UC_Profile
+  usecase (Update Profile) as UC_UpdateProfile
+  usecase (Complete Onboarding) as UC_Onboarding
+  usecase (Upload Avatar) as UC_Avatar
+}
+
+package "Goal Service" {
+  usecase (Browse Goal Catalog) as UC_BrowseGoals
+  usecase (Assign Goal) as UC_AssignGoal
+  usecase (Track Goal Progress) as UC_TrackGoal
+  usecase (Receive Goal Suggestions) as UC_GoalSuggest
+}
+
+package "Exercise Service" {
+  usecase (Log Exercise Session) as UC_LogExercise
+  usecase (View Exercise History) as UC_ViewExercise
+  usecase (Get Exercise Recommendations) as UC_ExerciseRecommend
+}
+
+package "Meal Service" {
+  usecase (Log Meal) as UC_LogMeal
+  usecase (View Meal Diary) as UC_ViewMeals
+  usecase (Get Nutrition Summary) as UC_NutritionSummary
+}
+
+Visitor --> UC_Register
+Visitor --> UC_Login
+Visitor --> UC_GoogleLogin
+UC_GoogleLogin --> GoogleIDP : OAuth consent
+
+User --> UC_Refresh
+User --> UC_Sessions
+User --> UC_Logout
+User --> UC_Profile
+User --> UC_UpdateProfile
+User --> UC_Onboarding
+User --> UC_Avatar
+User --> UC_BrowseGoals
+User --> UC_AssignGoal
+User --> UC_TrackGoal
+User --> UC_GoalSuggest
+User --> UC_LogExercise
+User --> UC_ViewExercise
+User --> UC_ExerciseRecommend
+User --> UC_LogMeal
+User --> UC_ViewMeals
+User --> UC_NutritionSummary
+
+Admin --> UC_Sessions
+Admin --> UC_Profile : audit users
+Admin --> UC_BrowseGoals
+
+UC_AssignGoal ..> UC_Onboarding : <<includes>>
+UC_LogExercise ..> UC_Profile : <<uses profile metrics>>
+UC_LogMeal ..> UC_Profile : <<uses profile metrics>>
+UC_GoalSuggest ..> UC_AssignGoal : <<extends>>
+
+@enduml
