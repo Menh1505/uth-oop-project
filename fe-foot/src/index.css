@@ -34,6 +34,9 @@ body {
 .btn-ghost {
   @apply bg-transparent hover:bg-gray-100;
 }
+.btn-outline {
+  @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
+}
 .btn-danger {
   @apply bg-red-600 text-white hover:bg-red-700;
 }
