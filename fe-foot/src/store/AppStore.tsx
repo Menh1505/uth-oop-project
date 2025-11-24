@@ -111,7 +111,15 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         const claims = (profileData as any).user || {};
 
         setAuthed(true);
+        const normalizedUserId =
+          profileData.user?.user_id ||
+          profileData.user?._id ||
+          profileData.user?.id ||
+          claims.user_id ||
+          claims.sub ||
+          undefined;
         setProfile({
+          user_id: normalizedUserId,
           name: profileData.user?.name || claims.email || "User",
           goal: "maintain",
           diet: "balanced",
@@ -279,7 +287,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           if (profileResponse.ok) {
             const profileData = await profileResponse.json();
             // API returns { success, user, needsOnboarding }
+            const normalizedUserId =
+              profileData.user?.user_id ||
+              profileData.user?._id ||
+              profileData.user?.id ||
+              undefined;
             setProfile({
+              user_id: normalizedUserId,
               name: profileData.user?.name || username,
               goal: "maintain",
               diet: "balanced",
@@ -303,6 +317,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           } else {
             // Profile endpoint failed, set default with onboarding
             setProfile({
+              user_id: undefined,
               name: username,
               goal: "maintain",
               diet: "balanced",
@@ -319,6 +334,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           console.error("Profile fetch error:", profileError);
           // Still logged in, but needs onboarding
           setProfile({
+            user_id: undefined,
             name: username,
             goal: "maintain",
             diet: "balanced",
@@ -363,6 +379,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         setAuthed(true);
         // Set admin profile (admins don't need onboarding)
         setProfile({
+          user_id: undefined,
           name: username,
           goal: "maintain",
           diet: "balanced",

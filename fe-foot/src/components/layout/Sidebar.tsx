@@ -2,10 +2,10 @@
 import { Link, useLocation } from "react-router-dom";
 
 const mainNav = [
+  { to: "/dashboard/health", label: "Dashboard sức khỏe" },
   { to: "/journal/meals", label: "Bữa ăn" },
   { to: "/exercise", label: "Buổi tập" },
   { to: "/ai", label: "AI gợi ý" },
-  { to: "/analytics", label: "Analytics" },
   { to: "/menu", label: "Menu" },
   { to: "/checkout", label: "Checkout" },
   { to: "/order", label: "Đơn hàng" },

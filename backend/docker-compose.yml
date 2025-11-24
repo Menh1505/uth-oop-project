@@ -74,6 +74,24 @@ services:
       retries: 5
       start_period: 5s
 
+  analytics-mongodb:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: analytics
+      MONGO_INITDB_ROOT_PASSWORD: analytics
+      MONGO_INITDB_DATABASE: analytics_service
+    ports:
+      - "27018:27017"
+    volumes:
+      - analytics_mongo_data:/data/db
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mongosh", "--username", "analytics", "--password", "analytics", "--eval", "db.adminCommand('ping')", "analytics_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ==========================
   # NGINX Gateway
   # ==========================
@@ -92,6 +110,7 @@ services:
       - goal-service
       - admin-service
       - exercise-service
+      - analytics-service
     networks:
       - backend
     restart: unless-stopped
@@ -207,6 +226,28 @@ services:
     networks:
       - backend
 
+  analytics-service:
+    build: ./analytics-service
+    expose:
+      - "8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      MONGO_URI: mongodb://analytics:analytics@analytics-mongodb:27017/analytics_service?authSource=admin
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: fitfood.events
+      RABBITMQ_MEAL_QUEUE: analytics.meal.logged.q
+      RABBITMQ_WORKOUT_QUEUE: analytics.workout.logged.q
+      RABBITMQ_GOAL_QUEUE: analytics.goal.updated.q
+      RABBITMQ_BODY_QUEUE: analytics.bodymetrics.updated.q
+    depends_on:
+      analytics-mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+
   ai-service:
     build: ./ai-service
     expose:
@@ -248,3 +289,4 @@ volumes:
   rabbitmq_data:
   redis_data:
   exercise_db_data:
+  analytics_mongo_data:

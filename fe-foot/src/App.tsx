@@ -29,6 +29,7 @@ const AdminOrders = lazy(() => import("./pages/admin/Orders"));
 const AdminVouchers = lazy(() => import("./pages/admin/Vouchers"));
 const AdminAnalytics = lazy(() => import("./pages/admin/Analytics"));
 const Shell = lazy(() => import("./components/layout/Shell"));
+const HealthDashboard = lazy(() => import("./pages/dashboard/HealthDashboard"));
 const NotFound = () => <div className="p-6">404 — Không tìm thấy trang</div>;
 function FullScreenSpinner() {
   return <div className="grid h-screen place-items-center">Đang tải…</div>;
@@ -238,6 +239,7 @@ export default function App() {
                   <Route path="workouts" element={<Workouts />} />
                 </Route>
                 <Route path="/ai" element={<Ai />} />
+                <Route path="/dashboard/health" element={<HealthDashboard />} />
                 <Route path="/analytics" element={<Analytics />} />
                 <Route path="/menu" element={<Menu />} />
                 <Route path="/checkout" element={<Checkout />} />
