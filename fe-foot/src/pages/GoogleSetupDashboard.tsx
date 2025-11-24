@@ -70,19 +70,22 @@ export default function GoogleSetupDashboard() {
       }
 
       // Update profile with body metrics
-      await updateProfile({
+      const updatedResult = await updateProfile({
         age: formData.age,
         weight: formData.weight,
         height: formData.height,
         fitness_goal: "maintain", // Set default goal to mark setup complete
       });
+      const updatedUser = (updatedResult as any)?.user;
 
       // Update local state to mark setup as complete
       completeOnboarding({
         ...profile,
-        age: formData.age,
-        weight: formData.weight,
-        height: formData.height,
+        age: updatedUser?.age ?? formData.age,
+        weight: updatedUser?.weight ?? formData.weight,
+        height: updatedUser?.height ?? formData.height,
+        bmi: updatedUser?.bmi ?? profile?.bmi,
+        bmi_category: updatedUser?.bmi_category ?? profile?.bmi_category,
         needsSetup: false, // Mark setup complete!
       });
 

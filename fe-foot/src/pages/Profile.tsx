@@ -15,6 +15,8 @@ interface UserData {
   age: number | null;
   weight: number | null;
   height: number | null;
+  bmi?: number | null;
+  bmi_category?: string | null;
   profile_picture_url: string | null;
   is_active: boolean;
   created_at: string;
@@ -75,6 +77,29 @@ const STATUS_STYLES: Record<
   },
 };
 
+const getBmiValue = (data: UserData | null): number | null => {
+  if (!data?.weight || !data?.height) {
+    return null;
+  }
+  if (typeof data.bmi === "number") {
+    return data.bmi;
+  }
+  const bmi = data.weight / Math.pow(data.height / 100, 2);
+  return Number(bmi.toFixed(1));
+};
+
+const getBmiCategory = (
+  data: UserData | null,
+  bmiValue: number | null
+): string | null => {
+  if (!bmiValue) return null;
+  if (data?.bmi_category) return data.bmi_category;
+  if (bmiValue < 18.5) return "Cân nặng thấp (gầy)";
+  if (bmiValue < 25) return "Bình thường";
+  if (bmiValue < 30) return "Thừa cân";
+  return "Béo phì";
+};
+
 export default function ProfilePage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -106,6 +131,8 @@ export default function ProfilePage() {
     thoi_gian_an: new Date().toISOString().slice(11, 16),
     ghi_chu: "",
   });
+  const bmiValue = getBmiValue(userData);
+  const bmiCategory = getBmiCategory(userData, bmiValue);
 
   const fetchMealsForDate = useCallback(
     async (date: string) => {
@@ -719,28 +746,17 @@ export default function ProfilePage() {
               </div>
 
               {/* BMI Calculation */}
-              {userData.weight && userData.height && (
+              {bmiValue !== null && (
                 <div className="rounded-2xl border border-sky-500/30 bg-sky-500/5 px-4 py-3">
                   <div className="text-[11px] font-semibold tracking-wide text-slate-300 uppercase mb-1.5">
                     Chỉ số BMI
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-2xl font-bold text-sky-400 tabular-nums">
-                      {(userData.weight / (userData.height / 100) ** 2).toFixed(
-                        1
-                      )}
+                      {bmiValue.toFixed(1)}
                     </div>
                     <div className="space-y-0.5 text-sm text-slate-200">
-                      <div>
-                        {(() => {
-                          const bmi =
-                            userData.weight / (userData.height / 100) ** 2;
-                          if (bmi < 18.5) return "Cân nặng thấp (gầy)";
-                          if (bmi < 25) return "Bình thường";
-                          if (bmi < 30) return "Thừa cân";
-                          return "Béo phì";
-                        })()}
-                      </div>
+                      <div>{bmiCategory}</div>
                       <div className="text-xs text-slate-400">
                         Duy trì ăn uống và luyện tập đều đặn để giữ sức khỏe ổn
                         định.

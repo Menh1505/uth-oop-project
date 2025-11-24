@@ -127,9 +127,9 @@ export default function ExercisePage() {
       showToast({ type: "error", message: "Thông tin buổi tập chưa hợp lệ" });
       return;
     }
-    const template =
-      formState.templateId &&
-      templates.find((tpl) => tpl.id === formState.templateId);
+    const template = formState.templateId
+      ? templates.find((tpl) => tpl.id === formState.templateId)
+      : undefined;
 
     setSubmitting(true);
     try {

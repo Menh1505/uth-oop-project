@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { ApiClient } from "@/lib/api/client";
@@ -54,6 +54,33 @@ export function GoogleLoginButton({
       // Store login method for routing on reload
       localStorage.setItem("loginMethod", "google");
 
+      const avatarUrl =
+        result.user.photoURL ||
+        result.user.providerData?.find((p) => p.photoURL)?.photoURL ||
+        null;
+
+      // Try to sync avatar to user-service if backend hasn't stored it yet
+      if (avatarUrl && response.access_token) {
+        try {
+          await fetch("/api/users/me", {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${response.access_token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              profile_picture_url: avatarUrl,
+            }),
+          });
+          console.log("[GoogleLoginButton] Avatar synced to user-service");
+        } catch (avatarSyncError) {
+          console.warn(
+            "[GoogleLoginButton] Failed to sync avatar:",
+            avatarSyncError
+          );
+        }
+      }
+
       // 4. Fetch user profile to check onboarding status
       try {
         const profileRes = await fetch("/api/users/me", {
@@ -73,11 +100,13 @@ export function GoogleLoginButton({
             profile: profileData,
             needsOnboarding: profileData.needsOnboarding === true,
             loginMethod: "google",
+            avatarUrl,
           });
         } else {
           onSuccess?.({
             ...response,
             loginMethod: "google",
+            avatarUrl,
           });
         }
       } catch (profileErr) {
@@ -89,6 +118,7 @@ export function GoogleLoginButton({
         onSuccess?.({
           ...response,
           needsOnboarding: true, // Assume needs onboarding if we can't verify
+          avatarUrl,
         });
       }
     } catch (err: any) {

@@ -6,7 +6,6 @@ import type {
   MealLog,
   Order,
   OrderStatus,
-  UserProfile,
   WorkoutLog,
 } from "../types";
 import { uid, nowISO } from "../lib/uid";
@@ -130,6 +129,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           age: profileData.user?.age,
           weight: profileData.user?.weight,
           height: profileData.user?.height,
+          bmi: profileData.user?.bmi ?? undefined,
+          bmi_category: profileData.user?.bmi_category ?? undefined,
           needsOnboarding: profileData.needsOnboarding === true,
           needsSetup: false, // If we got here with complete profile, setup is done
         });
@@ -199,7 +200,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   };
   const completeOnboarding = (p: CombinedProfile) => setProfile(p);
 
-  const updateProfile = async (updates: Partial<UserProfile>) => {
+  const updateProfile = async (updates: Partial<CombinedProfile>) => {
     if (!profile) throw new Error("No profile to update");
     const token = localStorage.getItem("authToken");
     if (!token) throw new Error("No auth token");
@@ -220,7 +221,24 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       }
 
       const updatedData = await response.json();
-      setProfile((prev) => (prev ? { ...prev, ...updates } : null));
+      const updatedUser = (updatedData as any)?.user;
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev, ...updates };
+        if (updatedUser) {
+          next.age = updatedUser.age ?? next.age;
+          next.weight = updatedUser.weight ?? next.weight;
+          next.height = updatedUser.height ?? next.height;
+          next.avatar =
+            updatedUser.profile_picture_url ?? next.avatar ?? undefined;
+          next.bmi = updatedUser.bmi ?? next.bmi;
+          next.bmi_category = updatedUser.bmi_category ?? next.bmi_category;
+          if (typeof updatedData.needsOnboarding === "boolean") {
+            next.needsOnboarding = updatedData.needsOnboarding;
+          }
+        }
+        return next;
+      });
       return updatedData;
     } catch (error) {
       console.error("Profile update error:", error);
@@ -274,7 +292,13 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
                 "admin"
                   ? "admin"
                   : "user",
+              age: profileData.user?.age,
+              weight: profileData.user?.weight,
+              height: profileData.user?.height,
+              bmi: profileData.user?.bmi ?? undefined,
+              bmi_category: profileData.user?.bmi_category ?? undefined,
               needsOnboarding: profileData.needsOnboarding === true,
+              needsSetup: false,
             });
           } else {
             // Profile endpoint failed, set default with onboarding
@@ -288,6 +312,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
               avatar: undefined,
               role: "user",
               needsOnboarding: true,
+              needsSetup: false,
             });
           }
         } catch (profileError) {
@@ -303,6 +328,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
             avatar: undefined,
             role: "user",
             needsOnboarding: true,
+            needsSetup: false,
           });
         }
         setLoginError(null);
@@ -345,6 +371,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           username,
           role: "admin",
           needsOnboarding: false,
+          needsSetup: false,
         });
         setLoginError(null);
       } else {

@@ -45,6 +45,28 @@ export const buildPublicAvatarUrl = (
   hostOverride?: string
 ) => absoluteUrl(url, hostOverride);
 
+const categorizeBmi = (bmi: number): string => {
+  if (bmi < 18.5) return "Cân nặng thấp (gầy)";
+  if (bmi < 25) return "Bình thường";
+  if (bmi < 30) return "Thừa cân";
+  return "Béo phì";
+};
+
+const calculateBmi = (
+  weight?: number | null,
+  height?: number | null
+): { bmi: number | null; bmi_category: string | null } => {
+  if (!weight || !height || height <= 0) {
+    return { bmi: null, bmi_category: null };
+  }
+
+  const bmiValue = weight / Math.pow(height / 100, 2);
+  return {
+    bmi: Number(bmiValue.toFixed(1)),
+    bmi_category: categorizeBmi(bmiValue),
+  };
+};
+
 // Helper function để convert MongoDB document thành UserResponse
 const toUserResponse = (user: IUser): UserResponse => ({
   user_id: user.user_id,
@@ -54,6 +76,7 @@ const toUserResponse = (user: IUser): UserResponse => ({
   age: user.age,
   weight: user.weight,
   height: user.height,
+  ...calculateBmi(user.weight, user.height),
   fitness_goal: user.fitness_goal,
   preferred_diet: user.preferred_diet,
   subscription_status: user.subscription_status,

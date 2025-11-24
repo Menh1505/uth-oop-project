@@ -1,20 +1,8 @@
 import { useEffect, useState } from "react";
 import Button from "./ui/Button";
 import { Input } from "./ui/Input";
-import type { UserProfile } from "../types";
+import type { CombinedProfile } from "../types";
 import { ApiClient } from "../lib/api/client";
-
-// Mở rộng thêm các field backend trả về
-type CombinedProfile = UserProfile & {
-  gender?: string | null;
-  age?: number | null;
-  weight?: string | null;
-  height?: string | null;
-  fitness_goal?: string | null;
-  preferred_diet?: string | null;
-  subscription_status?: string | null;
-  profile_picture_url?: string | null;
-};
 
 interface UserGoalSummary {
   goal_id: string;
@@ -34,6 +22,54 @@ interface ProfileModalProps {
   onClose: () => void;
   onUpdate: (profile: Partial<CombinedProfile>) => Promise<void>;
 }
+
+const parseMetric = (
+  value: number | string | null | undefined
+): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const categorizeBmi = (bmi: number): string => {
+  if (bmi < 18.5) return "Cân nặng thấp (gầy)";
+  if (bmi < 25) return "Bình thường";
+  if (bmi < 30) return "Thừa cân";
+  return "Béo phì";
+};
+
+const deriveBmiFromProfile = (
+  profile?: CombinedProfile | null
+): { value: number | null; category: string | null } => {
+  if (!profile) return { value: null, category: null };
+  const backendBmi =
+    typeof profile.bmi === "number" && Number.isFinite(profile.bmi)
+      ? profile.bmi
+      : null;
+
+  if (backendBmi !== null) {
+    return {
+      value: backendBmi,
+      category: profile.bmi_category || categorizeBmi(backendBmi),
+    };
+  }
+
+  const weight = parseMetric(profile.weight as any);
+  const height = parseMetric(profile.height as any);
+  if (!weight || !height || height <= 0) {
+    return { value: null, category: null };
+  }
+
+  const computed = Number(
+    (weight / Math.pow(height / 100, 2)).toFixed(1)
+  );
+  return { value: computed, category: categorizeBmi(computed) };
+};
 
 export default function ProfileModal({
   profile,
@@ -116,6 +152,8 @@ export default function ProfileModal({
           age: user.age,
           weight: user.weight,
           height: user.height,
+          bmi: typeof user.bmi === "number" ? user.bmi : undefined,
+          bmi_category: user.bmi_category || undefined,
           fitness_goal: user.fitness_goal,
           preferred_diet: user.preferred_diet,
           subscription_status: user.subscription_status,
@@ -228,6 +266,8 @@ export default function ProfileModal({
   // Ưu tiên dữ liệu từ server, fallback về profile prop
   const displayProfile = (serverProfile || profile) as CombinedProfile | null;
   if (!displayProfile) return null;
+  const { value: bmiValue, category: bmiCategory } =
+    deriveBmiFromProfile(displayProfile);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -636,6 +676,25 @@ export default function ProfileModal({
                             </div>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {bmiValue !== null && (
+                      <div className="rounded-2xl border border-sky-500/30 bg-sky-500/5 px-3 py-2.5 flex flex-col gap-1">
+                        <div className="text-[11px] font-semibold tracking-wide text-slate-200 uppercase">
+                          BMI hiện tại
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl font-bold text-sky-300 tabular-nums">
+                            {bmiValue.toFixed(1)}
+                          </div>
+                          <div className="text-sm text-slate-100">
+                            {bmiCategory || "Chưa phân loại"}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          Dựa trên cân nặng và chiều cao đã cập nhật từ hồ sơ.
+                        </p>
                       </div>
                     )}
 

@@ -67,6 +67,12 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
   # ==========================
   # NGINX Gateway
@@ -106,8 +112,10 @@ services:
       FIREBASE_CLIENT_EMAIL: firebase-adminsdk-fbsvc@proj-mic-d4567.iam.gserviceaccount.com
       FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDL9L46yw8Yseke\nmNpxztmh3Ow/JMXzkSMzn3lEypUyw6UXSuCJEDfbyDgf/QXMNsyYih08k7qM0414\nxhq1XVKRk3ZlyMFDVxNbjW146s3gPqLKb1QD2R7z3BTVOeKWjXSNX1fUmUNoSTks\nCi4TUPcuB+LFdX2j2pVQRICZ48BV33zNWoel95yZOhJpb1jKxP8xL8SBQkz8nUeV\nPBKHiUbiKI9KFm+fJ/ePf9RUt7DlF1f4IpocGoSyj+PvKXFv0/hv8ckFwKVuXjIn\nPYhxJL3h5GcbX/xUdq1zXztSG4lhMFOnNpVaeJEtru34khZG1p2m42WXyYXzPFh6\n8SV5dsrBAgMBAAECgf8Cp9fSQX1GKmA0Bcl9BzR45xIsavjTiGWXm9FNvqrdU67S\nntGi9z3C9C3G54SBJDWFxvFFLfyVLiv+u+rycZn29fSUtAh61/y93xmNztY0v/Fe\nsWm7+G0Zam7bApCbZTwfRck0UMqP5mQtg/Rq9qLr9oOoDoo+7URZxzU6y7xgDIL0\n1zbw7Ig2UrPqgpsYoHhqUhcxgh6xEbGsG0WRTOVTKdxj12T6FdixLkLzcjnY3WCj\n0SURAd2cbI1YJB8hycwVOoeJsBgerwu7KtXXy25XEzAnLGFofWwzfYmnUP/n7Je+\nrfQyL+PqaezL/T0/tZoDLO/lks+bMNSypC/ivRkCgYEA60NCNEnV9odrTkHqV6Qk\nzbm4jTI9HP6AIB79dsNcRSd680LdtJX8GJC+HTgy6xriw4mSZrdfRVDodzXz8emQ\nFUIQmmP3KMB5vqDuR62riIiGOAiiVB5qJ0WyWsKF/iVdy6nDWujgKqGuz4zLeVrU\nYJrclz+stGEy3oCaH5WnsNsCgYEA3e8LMOsW6Gm7scpc7C5bFKEdKW3Thwkyu1Jc\ngZg8noLsJLevr2RTCa/e4DL3L0M87axtiSXaD+UBS1DE6o0vud8YjV3lvqVXug+K\nJl/kKv9PNyouSFmZhE30Ik38+igSoWiKXZn4K3Sl9KWQpDzA7AOKrzDmdvhOT1YT\nEJy2x5MCgYEAt7tJQui/Ds9ngDB+QX/RtlDqzmqDy9b+XReWv1+G+gMBRGXeG6Be\nxxiTQOKY8X+HxUn1af6fitTLF/6syyqq+c8khE65wbu/2J56OMRrCDAHEk+75pHy\nOUV3KuZsGrU38UxdYuwn1WN70F+WsOm8ns2SpRR3Xk/imF46/5uy4K0CgYAo3e/N\nnjylp3Kslnrt8stKzTA1hMfCwerZm5z1MDdZaPpa+IgdX/f6fKwp1Li3t0Xs7idt\nbc7txlmqqMDaAA2dyHsY7QV1SbURyfLChj3ZvRG1Mss6/2TJfCFMf9fpqJ9loX55\nJfUQ63XzytkLpTRRQYW0JOkLV0X0TgFMuc7eiQKBgQDE8wXg7VsWdKfnyeZDDSTN\n4fq8dEQjLEbpC54GaTeCR0oESRhJXmEEpXZsDoQe/JtlkuCzPmij5DB6Pe41idSx\nAlb1BigpiQavfG9UcLYGxM0x2hmvGEJ8BjMNEETtuWGve48BWofOIqBQkX6T/PtF\nRu6go+Rbj430atUEYcKrlg==\n-----END PRIVATE KEY-----\n"
     depends_on:
-      - mongodb
-      - rabbitmq
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - backend
 
@@ -124,8 +132,10 @@ services:
       PUBLIC_UPLOAD_BASE_URL: /api/users/uploads
       SERVICE_UPLOAD_BASE_PATH: /users/uploads
     depends_on:
-      - mongodb
-      - rabbitmq
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     networks:
       - backend
     volumes:
@@ -214,12 +224,18 @@ services:
       RABBITMQ_EXCHANGE: ai_exchange
       RABBITMQ_QUEUE: ai-service.requests.q
       RABBITMQ_ROUTING_KEYS: ai.coach_request
+      RABBITMQ_RETRY_ATTEMPTS: 5
+      RABBITMQ_RETRY_DELAY_MS: 5000
       NODE_ENV: production
     depends_on:
-      - mongodb
-      - rabbitmq
-      - user-service
-      - goal-service
+      mongodb:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      goal-service:
+        condition: service_started
     networks:
       - backend
 

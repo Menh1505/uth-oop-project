@@ -3,7 +3,7 @@ import Button from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppStore } from "../../store/useAppStore";
-import type { DailySummary, MealLog } from "../../types";
+import type { MealLog } from "../../types";
 
 const MEAL_BASE = "/api/meals";
 const MEAL_COLLECTION_URL = `${MEAL_BASE}/`;

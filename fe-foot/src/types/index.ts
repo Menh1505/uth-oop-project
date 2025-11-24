@@ -52,11 +52,17 @@ export type UserProfile = {
   gender?: GenderEnum;
   height?: number; // cm
   weight?: number | string; // kg or string for flexibility
+  bmi?: number;
+  bmi_category?: string;
   activity_level?: ActivityLevelEnum;
   dietary_restrictions?: string[];
   allergies?: string[];
   health_conditions?: string[];
+  fitness_goal?: string;
   fitness_goals?: string[];
+  preferred_diet?: string;
+  subscription_status?: string;
+  payment_method?: string;
   is_premium?: boolean;
   subscription_expires_at?: string; // ISO 8601 datetime
   created_at?: string; // ISO 8601 datetime
@@ -79,6 +85,8 @@ export type CombinedProfile = UserProfile & {
   age?: number;
   weight?: number;
   height?: number;
+  phone?: string;
+  bio?: string;
 };
 
 // Meal Service Types

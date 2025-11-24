@@ -2,7 +2,7 @@ import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Select } from "../components/ui/Select";
-import type { UserProfile } from "../types";
+import type { CombinedProfile } from "../types";
 import { useAppStore } from "../store/useAppStore";
 import { useState, useRef } from "react";
 import type { FormEvent, ChangeEvent } from "react";
@@ -99,7 +99,7 @@ export default function Onboarding() {
       await ApiClient.put("/users/me", profileData);
 
       // Cập nhật state phía frontend
-      const profile: UserProfile = {
+      const profile: CombinedProfile = {
         user_id: "",
         name: profileData.name || "User",
         email: "",
@@ -115,6 +115,10 @@ export default function Onboarding() {
         is_premium: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        needsOnboarding: false,
+        needsSetup: false,
+        loginMethod: "email",
+        goal: "maintain",
       };
 
       completeOnboarding(profile);

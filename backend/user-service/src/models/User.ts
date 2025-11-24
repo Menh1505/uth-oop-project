@@ -330,6 +330,8 @@ export interface UserResponse {
   age?: number | null;
   weight?: number | null;
   height?: number | null;
+  bmi?: number | null;
+  bmi_category?: string | null;
   fitness_goal?: string | null;
   preferred_diet?: string | null;
   subscription_status?: 'Basic' | 'Premium' | string;

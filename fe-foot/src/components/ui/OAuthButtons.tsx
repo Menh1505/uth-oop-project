@@ -12,6 +12,13 @@ export default function OAuthButtons() {
     console.log("[OAuthButtons] needsOnboarding:", data.needsOnboarding);
 
     // Set profile with onboarding status if available
+    const googleAvatar =
+      data.profile?.user?.profile_picture_url ||
+      data.profile?.user?.avatar ||
+      data.avatarUrl ||
+      data.photoURL ||
+      null;
+
     if (data.profile) {
       const profileData = data.profile;
       completeOnboarding({
@@ -21,14 +28,20 @@ export default function OAuthButtons() {
         budgetPerMeal: 50000,
         timePerWorkout: 60,
         username: profileData.user?.username || data.email || "",
-        avatar: profileData.user?.profile_picture_url || undefined,
+        avatar: googleAvatar || undefined,
         loginMethod: "google",
         role:
           (profileData.user?.role || "user").toString().toLowerCase() ===
           "admin"
             ? "admin"
             : "user",
+        age: profileData.user?.age,
+        weight: profileData.user?.weight,
+        height: profileData.user?.height,
+        bmi: profileData.user?.bmi ?? undefined,
+        bmi_category: profileData.user?.bmi_category ?? undefined,
         needsOnboarding: profileData.needsOnboarding === true,
+        needsSetup: Boolean(profileData.needsSetup),
       });
     } else {
       // Fallback: assume needs onboarding for new users
