@@ -197,6 +197,32 @@ services:
     networks:
       - backend
 
+  ai-service:
+    build: ./ai-service
+    expose:
+      - "3004"
+    environment:
+      PORT: 3004
+      JWT_SECRET: shared-secret
+      USER_SERVICE_URL: http://user-service:3002
+      GOAL_SERVICE_URL: http://goal-service:3006
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: gpt-3.5-turbo
+      MAX_TOKENS: 500
+      TEMPERATURE: 0.7
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: ai_exchange
+      RABBITMQ_QUEUE: ai-service.requests.q
+      RABBITMQ_ROUTING_KEYS: ai.coach_request
+      NODE_ENV: production
+    depends_on:
+      - mongodb
+      - rabbitmq
+      - user-service
+      - goal-service
+    networks:
+      - backend
+
 networks:
   backend:
     driver: bridge
