@@ -83,7 +83,30 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       const token =
         localStorage.getItem("authToken") ||
         localStorage.getItem("accessToken");
+      const loginMethod = localStorage.getItem("loginMethod");
       if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      // Admin tokens không có profile trong user-service → bỏ qua bước gọi /users/me
+      if (loginMethod === "admin") {
+        const adminUsername = localStorage.getItem("adminUsername") || "Admin";
+        setAuthed(true);
+        setProfile({
+          user_id: undefined,
+          name: adminUsername,
+          goal: "maintain",
+          diet: "balanced",
+          budgetPerMeal: 50000,
+          timePerWorkout: 60,
+          username: adminUsername,
+          avatar: undefined,
+          loginMethod: "admin",
+          role: "admin",
+          needsOnboarding: false,
+          needsSetup: false,
+        });
         setLoading(false);
         return;
       }
@@ -205,6 +228,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("userProfile");
+    localStorage.removeItem("loginMethod");
+    localStorage.removeItem("adminUsername");
   };
   const completeOnboarding = (p: CombinedProfile) => setProfile(p);
 
@@ -275,6 +300,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         if (data.refresh_token) {
           localStorage.setItem("refreshToken", data.refresh_token);
         }
+        localStorage.setItem("loginMethod", "email");
+        localStorage.removeItem("adminUsername");
         setAuthed(true);
 
         // Now fetch user profile from /api/users/me
@@ -376,6 +403,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
         // Lưu cả hai khóa để mọi nơi có thể đọc được token
         localStorage.setItem("authToken", data.access_token);
         localStorage.setItem("accessToken", data.access_token);
+        if (data.refresh_token) {
+          localStorage.setItem("refreshToken", data.refresh_token);
+        }
+        localStorage.setItem("loginMethod", "admin");
+        localStorage.setItem("adminUsername", username);
         setAuthed(true);
         // Set admin profile (admins don't need onboarding)
         setProfile({
@@ -387,6 +419,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
           timePerWorkout: 60,
           username,
           role: "admin",
+          loginMethod: "admin",
           needsOnboarding: false,
           needsSetup: false,
         });

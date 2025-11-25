@@ -53,6 +53,7 @@ export function GoogleLoginButton({
       }
       // Store login method for routing on reload
       localStorage.setItem("loginMethod", "google");
+      localStorage.removeItem("adminUsername");
 
       const avatarUrl =
         result.user.photoURL ||

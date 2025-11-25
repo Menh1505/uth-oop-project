@@ -15,6 +15,8 @@ interface User {
   username: string;
   email: string;
   role: string;
+  subscriptionStatus?: string;
+  createdAt?: string;
 }
 
 interface Session {
@@ -28,6 +30,56 @@ interface Session {
   current?: boolean;
 }
 
+const pickUserId = (record: any): string => {
+  return (
+    record?.id ||
+    record?._id ||
+    record?.user_id ||
+    record?.email ||
+    record?.username ||
+    `user-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  );
+};
+
+const normalizeUsersResponse = (data: unknown): User[] => {
+  const candidates = Array.isArray(data)
+    ? data
+    : Array.isArray((data as any)?.users)
+      ? (data as any).users
+      : Array.isArray((data as any)?.data)
+        ? (data as any).data
+        : Array.isArray((data as any)?.users?.users)
+          ? (data as any).users.users
+          : [];
+
+  return candidates.map((record: any) => ({
+    id: pickUserId(record),
+    username: record?.username || record?.name || record?.email || "Unknown",
+    email: record?.email || "—",
+    role:
+      (record?.role || (record?.email?.includes("admin") ? "admin" : "user")) ??
+      "user",
+    subscriptionStatus: record?.subscription_status || record?.status,
+    createdAt: record?.created_at,
+  }));
+};
+
+const normalizeSessionResponse = (
+  sessionsData: { items?: Session[] } | Session[] | undefined,
+  normalizeUserId: (value: unknown) => string
+): Session[] => {
+  const rawList = Array.isArray((sessionsData as any)?.items)
+    ? ((sessionsData as { items?: Session[] }).items as Session[])
+    : Array.isArray(sessionsData)
+      ? (sessionsData as Session[])
+      : [];
+
+  return rawList.map((session: any) => ({
+    ...session,
+    user_id: normalizeUserId(session?.user_id),
+  }));
+};
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -39,29 +91,39 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
+  const fetchSessionsWithFallback = async () => {
+    try {
+      const sessionsData =
+        await ApiClient.get<{ items?: Session[] } | Session[]>(
+          "/admin/sessions"
+        );
+      return normalizeSessionResponse(sessionsData, normalizeUserId);
+    } catch (primaryError) {
+      console.warn(
+        "[AdminDashboard] /admin/sessions failed, fallback to /auth/sessions",
+        primaryError
+      );
+      const fallbackData = await ApiClient.get<{ items?: Session[] } | Session[]>(
+        "/auth/sessions"
+      );
+      return normalizeSessionResponse(fallbackData, normalizeUserId);
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const [statsData, usersData, sessionsData] = await Promise.all([
-        ApiClient.get<AdminStats>("/admin/stats"),
-        ApiClient.get<User[]>("/admin/users"),
-        ApiClient.get<{ items?: Session[] } | Session[]>("/admin/sessions"),
-      ]);
 
+      const usersDataRaw = await fetchUsersWithFallback();
+      const normalizedUsers = normalizeUsersResponse(usersDataRaw);
+      setUsers(normalizedUsers);
+
+      const statsData = await fetchStatsWithFallback(normalizedUsers);
       setStats(statsData);
-      setUsers(usersData || []);
-      const sessionList = Array.isArray((sessionsData as any)?.items)
-        ? ((sessionsData as { items?: Session[] }).items as Session[])
-        : Array.isArray(sessionsData)
-          ? (sessionsData as Session[])
-          : [];
-      const normalizedSessions: Session[] = sessionList.map((session: any) => ({
-        ...session,
-        user_id: normalizeUserId(session?.user_id),
-      }));
-      setSessions(normalizedSessions);
+
+      const sessionsList = await fetchSessionsWithFallback();
+      setSessions(sessionsList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error loading data");
     } finally {
@@ -153,9 +215,11 @@ export default function AdminDashboard() {
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">ID</th>
-                  <th className="text-left p-2">Username</th>
+                  <th className="text-left p-2">Tên</th>
                   <th className="text-left p-2">Email</th>
                   <th className="text-left p-2">Role</th>
+                  <th className="text-left p-2">Gói</th>
+                  <th className="text-left p-2">Tạo lúc</th>
                   <th className="text-left p-2">Actions</th>
                 </tr>
               </thead>
@@ -166,6 +230,10 @@ export default function AdminDashboard() {
                     <td className="p-2">{user.username}</td>
                     <td className="p-2">{user.email}</td>
                     <td className="p-2">{user.role}</td>
+                    <td className="p-2">{user.subscriptionStatus || "—"}</td>
+                    <td className="p-2 text-xs">
+                      {user.createdAt ? formatDate(user.createdAt) : "—"}
+                    </td>
                     <td className="p-2">
                       <button
                         onClick={() => deleteUser(user.id)}
@@ -246,3 +314,35 @@ export default function AdminDashboard() {
     </AdminLayout>
   );
 }
+  const fetchUsersWithFallback = async (): Promise<any> => {
+    try {
+      const usersData = await ApiClient.get<User[]>("/admin/users");
+      return usersData;
+    } catch (primaryError) {
+      console.warn(
+        "[AdminDashboard] /admin/users failed, fallback to /users/admin/users",
+        primaryError
+      );
+      return ApiClient.get("/users/admin/users");
+    }
+  };
+
+  const fetchStatsWithFallback = async (
+    normalizedUsers: User[]
+  ): Promise<AdminStats> => {
+    try {
+      return await ApiClient.get<AdminStats>("/admin/stats");
+    } catch (primaryError) {
+      console.warn(
+        "[AdminDashboard] /admin/stats failed, using fallback stats",
+        primaryError
+      );
+      const totalUsers = normalizedUsers.length;
+      return {
+        totalUsers,
+        activeUsers: totalUsers,
+        totalOrders: 0,
+        totalRevenue: 0,
+      };
+    }
+  };

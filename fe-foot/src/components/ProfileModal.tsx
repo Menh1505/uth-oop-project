@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import Button from "./ui/Button";
 import { Input } from "./ui/Input";
-import type { CombinedProfile } from "../types";
+import type {
+  CombinedProfile,
+  DailySummary,
+  DailySummaryStatus,
+} from "../types";
 import { ApiClient } from "../lib/api/client";
 
 interface UserGoalSummary {
@@ -22,6 +26,24 @@ interface ProfileModalProps {
   onClose: () => void;
   onUpdate: (profile: Partial<CombinedProfile>) => Promise<void>;
 }
+
+const CALO_STATUS_STYLES: Record<
+  DailySummaryStatus,
+  { badge: string; text: string }
+> = {
+  "Đạt mục tiêu": {
+    badge: "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
+    text: "text-emerald-200",
+  },
+  "Chưa đạt": {
+    badge: "border-amber-500/40 bg-amber-500/10 text-amber-100",
+    text: "text-amber-200",
+  },
+  "Vượt mức": {
+    badge: "border-rose-500/40 bg-rose-500/10 text-rose-100",
+    text: "text-rose-200",
+  },
+};
 
 const parseMetric = (
   value: number | string | null | undefined
@@ -89,6 +111,9 @@ export default function ProfileModal({
   const [userGoal, setUserGoal] = useState<UserGoalSummary | null>(null);
   const [goalLoading, setGoalLoading] = useState(false);
   const [goalError, setGoalError] = useState<string | null>(null);
+  const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: profile?.name || "",
@@ -127,6 +152,27 @@ export default function ProfileModal({
       setGoalError(err?.message || "Không thể tải mục tiêu");
     } finally {
       setGoalLoading(false);
+    }
+  };
+
+  const fetchDailySummary = async (date?: string) => {
+    const targetDate = date || new Date().toISOString().slice(0, 10);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    try {
+      const res: any = await ApiClient.get(`/meals/me?date=${targetDate}`);
+      const summary =
+        res?.summary ??
+        (res?.data && typeof res.data === "object"
+          ? res.data.summary
+          : null);
+      setDailySummary(summary ?? null);
+    } catch (err: any) {
+      console.error("ProfileModal balance fetch failed:", err);
+      setDailySummary(null);
+      setSummaryError(err?.message || "Không thể tải dữ liệu calories");
+    } finally {
+      setSummaryLoading(false);
     }
   };
 
@@ -180,6 +226,7 @@ export default function ProfileModal({
 
     hydrateFromApi();
     fetchUserGoal();
+    fetchDailySummary();
     return () => {
       active = false;
     };
@@ -315,6 +362,51 @@ export default function ProfileModal({
     displayProfile.fitness_goal ||
     (displayProfile as any).goal ||
     "Chưa đặt mục tiêu";
+  const consumedCalories =
+    typeof dailySummary?.tong_calo === "number" &&
+    Number.isFinite(dailySummary.tong_calo)
+      ? Math.round(dailySummary.tong_calo)
+      : null;
+  const targetCalories =
+    typeof dailySummary?.calo_muc_tieu === "number" &&
+    Number.isFinite(dailySummary.calo_muc_tieu) &&
+    dailySummary.calo_muc_tieu > 0
+      ? Math.round(dailySummary.calo_muc_tieu)
+      : null;
+  const balanceValue =
+    consumedCalories !== null && targetCalories !== null
+      ? consumedCalories - targetCalories
+      : null;
+  const summaryPercent =
+    consumedCalories !== null && targetCalories
+      ? Math.min(
+          180,
+          Math.round((consumedCalories / Math.max(targetCalories, 1)) * 100)
+        )
+      : null;
+  const balanceStatusStyle =
+    (dailySummary?.trang_thai_calo &&
+      CALO_STATUS_STYLES[dailySummary.trang_thai_calo]) ||
+    null;
+  const balanceDateLabel = dailySummary?.ngay
+    ? new Date(dailySummary.ngay).toLocaleDateString("vi-VN", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+      })
+    : "Hôm nay";
+  const balanceProgressColor =
+    summaryPercent === null
+      ? "bg-slate-700"
+      : summaryPercent <= 100
+      ? "bg-emerald-400"
+      : summaryPercent <= 120
+      ? "bg-amber-400"
+      : "bg-rose-500";
+  const formattedBalance =
+    balanceValue === null
+      ? null
+      : `${balanceValue >= 0 ? "+" : ""}${balanceValue} kcal`;
 
   return (
     <>
@@ -697,6 +789,115 @@ export default function ProfileModal({
                         </p>
                       </div>
                     )}
+
+                    <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 px-3.5 py-3 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-[11px] font-semibold tracking-wide text-slate-200 uppercase">
+                            Cân bằng calories
+                          </div>
+                          <p className="text-[11px] text-slate-400">
+                            {balanceDateLabel}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {balanceStatusStyle && dailySummary?.trang_thai_calo && (
+                            <span
+                              className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${balanceStatusStyle.badge}`}
+                            >
+                              {dailySummary.trang_thai_calo}
+                            </span>
+                          )}
+                          <Button
+                            type="button"
+                            onClick={() => fetchDailySummary()}
+                            disabled={summaryLoading}
+                            className="h-7 rounded-lg px-2.5 text-[11px] font-medium bg-violet-500/80 hover:bg-violet-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {summaryLoading ? "Đang tải..." : "Làm mới"}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {summaryError && (
+                        <p className="text-[11px] text-amber-200">
+                          {summaryError}
+                        </p>
+                      )}
+
+                      {!summaryError && summaryLoading && !dailySummary ? (
+                        <div className="h-20 rounded-2xl bg-slate-800/70 animate-pulse" />
+                      ) : consumedCalories === null ? (
+                        <p className="text-[12px] text-slate-300">
+                          Chưa có dữ liệu calories cho ngày hôm nay. Thêm bữa ăn
+                          để thấy cân bằng năng lượng.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-slate-50">
+                            <div className="space-y-0.5">
+                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                                Nạp hôm nay
+                              </p>
+                              <p className="text-lg font-semibold text-emerald-200">
+                                {consumedCalories} kcal
+                              </p>
+                            </div>
+                            <div className="space-y-0.5">
+                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                                Mục tiêu
+                              </p>
+                              <p className="text-lg font-semibold text-slate-200">
+                                {targetCalories !== null
+                                  ? `${targetCalories} kcal`
+                                  : "Chưa cài đặt"}
+                              </p>
+                            </div>
+                            <div className="space-y-0.5">
+                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                                Balance
+                              </p>
+                              <p
+                                className={`text-lg font-semibold ${
+                                  balanceValue !== null && balanceValue > 0
+                                    ? "text-amber-200"
+                                    : balanceValue !== null && balanceValue < 0
+                                    ? "text-emerald-200"
+                                    : "text-slate-200"
+                                }`}
+                              >
+                                {formattedBalance || "—"}
+                              </p>
+                            </div>
+                          </div>
+                          {summaryPercent !== null && (
+                            <div className="text-[11px] space-y-1">
+                              <div className="flex items-center justify-between text-slate-400">
+                                <span>Tiến độ {summaryPercent}%</span>
+                                {formattedBalance && (
+                                  <span
+                                    className={
+                                      balanceStatusStyle?.text ||
+                                      "text-slate-200"
+                                    }
+                                  >
+                                    {formattedBalance}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                                <div
+                                  className={`h-full ${balanceProgressColor}`}
+                                  style={{
+                                    width: `${Math.min(summaryPercent, 160)}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
 
                     {(displayProfile as any).bio && (
                       <div className="space-y-0.5">

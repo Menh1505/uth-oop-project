@@ -73,7 +73,7 @@ export type UserProfile = {
 // Combines UserProfile from backend with app-specific fields
 export type CombinedProfile = UserProfile & {
   role?: "user" | "admin";
-  loginMethod?: "google" | "email"; // Track which auth method was used
+  loginMethod?: "google" | "email" | "admin"; // Track which auth method was used
   needsOnboarding?: boolean;
   needsSetup?: boolean; // For Google users: need to set age/weight/height
   goal?: string;
