@@ -13,6 +13,7 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+      - ./mongodb/init-scripts:/docker-entrypoint-initdb.d:ro
     networks:
       - backend
     healthcheck:
@@ -74,23 +75,6 @@ services:
       retries: 5
       start_period: 5s
 
-  analytics-mongodb:
-    image: mongo:7
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: analytics
-      MONGO_INITDB_ROOT_PASSWORD: analytics
-      MONGO_INITDB_DATABASE: analytics_service
-    ports:
-      - "27018:27017"
-    volumes:
-      - analytics_mongo_data:/data/db
-    networks:
-      - backend
-    healthcheck:
-      test: ["CMD", "mongosh", "--username", "analytics", "--password", "analytics", "--eval", "db.adminCommand('ping')", "analytics_service"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # ==========================
   # NGINX Gateway
@@ -169,6 +153,10 @@ services:
       PORT: 3004
       JWT_SECRET: shared-secret
       GOAL_SERVICE_URL: http://goal-service:3006/goals
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: fitfood.events
+      RABBITMQ_EXCHANGE_TYPE: topic
+      RABBITMQ_MEAL_ROUTING_KEY: meal.logged
     depends_on:
       - mongodb
       - goal-service
@@ -190,6 +178,10 @@ services:
       DB_PASSWORD: password
       DB_NAME: fitfood_exercise_db
       JWT_SECRET: shared-secret
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: fitfood.events
+      RABBITMQ_EXCHANGE_TYPE: topic
+      RABBITMQ_WORKOUT_ROUTING_KEY: workout.logged
     depends_on:
       exercise-db:
         condition: service_healthy
@@ -229,11 +221,11 @@ services:
   analytics-service:
     build: ./analytics-service
     expose:
-      - "8080"
+      - "3007"
     environment:
       NODE_ENV: production
-      PORT: 8080
-      MONGO_URI: mongodb://analytics:analytics@analytics-mongodb:27017/analytics_service?authSource=admin
+      PORT: 3007
+      MONGO_URI: mongodb://analytics:analytics@mongodb:27017/analytics_service?authSource=analytics_service
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: fitfood.events
       RABBITMQ_MEAL_QUEUE: analytics.meal.logged.q
@@ -241,7 +233,7 @@ services:
       RABBITMQ_GOAL_QUEUE: analytics.goal.updated.q
       RABBITMQ_BODY_QUEUE: analytics.bodymetrics.updated.q
     depends_on:
-      analytics-mongodb:
+      mongodb:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -289,4 +281,3 @@ volumes:
   rabbitmq_data:
   redis_data:
   exercise_db_data:
-  analytics_mongo_data:

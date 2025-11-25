@@ -18,7 +18,7 @@ npm run dev # hoặc npm run build && npm start
 
 ## Biến môi trường
 - `PORT` (mặc định 8080)
-- `MONGO_URI` (ví dụ: `mongodb://analytics:analytics@analytics-mongodb:27017/analytics_service?authSource=admin`)
+- `MONGO_URI` (ví dụ: `mongodb://analytics:analytics@mongodb:27017/analytics_service?authSource=analytics_service`)
 - `RABBITMQ_URL` (ví dụ: `amqp://admin:admin@rabbitmq:5672`)
 - `RABBITMQ_EXCHANGE` (mặc định `fitfood.events`)
 - `RABBITMQ_*_QUEUE` (các queue cho meal/workout/goal/body)

@@ -99,4 +99,9 @@ export class MealRepository {
       .exec();
     return docs.map((doc) => this.mapTemplate(doc));
   }
+
+  static async findTemplateById(id: string): Promise<MealTemplateDTO | null> {
+    const doc = await MealTemplateModel.findById(id).exec();
+    return doc ? this.mapTemplate(doc) : null;
+  }
 }

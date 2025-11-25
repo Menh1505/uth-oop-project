@@ -616,6 +616,9 @@ export type MenuItem = {
   protein: number;
   carbs: number;
   fat: number;
+  description?: string | null;
+  image_url?: string | null;
+  meal_type?: string;
 };
 
 export type CartItem = {

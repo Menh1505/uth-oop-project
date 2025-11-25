@@ -4,6 +4,19 @@ import { MealService } from '../services/MealService';
 import logger from '../config/logger';
 
 export class MealController {
+  static async getMenu(_req: Request, res: Response) {
+    try {
+      const menu = await MealService.listMenuItems();
+      res.json({ success: true, data: menu });
+    } catch (error: any) {
+      logger.error({ err: error }, '[meal-service] Fetch public menu failed');
+      res.status(500).json({
+        success: false,
+        message: error?.message || 'Không thể tải menu',
+      });
+    }
+  }
+
   static async status(_req: AuthRequest, res: Response) {
     res.json({
       service: 'meal-service',
@@ -154,6 +167,25 @@ export class MealController {
       res.status(500).json({
         success: false,
         message: error?.message || 'Không thể tải danh sách món ăn mẫu',
+      });
+    }
+  }
+
+  static async addToCart(req: Request, res: Response) {
+    try {
+      const mealId = req.params.mealId;
+      const quantity = Number((req.body as any)?.quantity ?? 1);
+      const result = await MealService.addMenuItemToCart(mealId, quantity);
+      res.json({
+        success: true,
+        message: 'Đã ghi nhận vào giỏ hàng',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error({ err: error, mealId: req.params.mealId }, '[meal-service] Add to cart failed');
+      res.status(400).json({
+        success: false,
+        message: error?.message || 'Không thể thêm vào giỏ',
       });
     }
   }

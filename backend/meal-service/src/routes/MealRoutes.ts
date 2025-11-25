@@ -4,6 +4,7 @@ import { MealController } from '../controllers/MealController';
 
 const router = Router();
 
+router.get('/', MealController.getMenu);
 router.get('/status', MealController.status);
 router.get('/templates', MealController.getTemplates);
 router.post('/', authenticate, MealController.createMeal);
@@ -11,5 +12,6 @@ router.get('/me', authenticate, MealController.getMyMeals);
 router.put('/:mealId', authenticate, MealController.updateMeal);
 router.delete('/:mealId', authenticate, MealController.deleteMeal);
 router.get('/summary', authenticate, MealController.getDailySummary);
+router.post('/:mealId/add-to-cart', MealController.addToCart);
 
 export default router;

@@ -1,4 +1,5 @@
 import { ExerciseRepository } from '../repositories/ExerciseRepository';
+import logger from '../config/logger';
 import { 
   CreateExercisePayload, 
   UpdateExercisePayload, 
@@ -11,6 +12,7 @@ import {
   ExerciseRecommendation,
   CalorieBurnFactors
 } from '../models/Exercise';
+import { analyticsEventPublisher } from './AnalyticsEventPublisher';
 
 export class ExerciseService {
   // Create a new exercise
@@ -65,7 +67,9 @@ export class ExerciseService {
       );
     }
 
-    return await ExerciseRepository.create(userId, exerciseData);
+    const exercise = await ExerciseRepository.create(userId, exerciseData);
+    await this.publishWorkoutLoggedEvent(userId, exercise);
+    return exercise;
   }
 
   // Get exercise by ID
@@ -666,5 +670,80 @@ export class ExerciseService {
     }
 
     return Math.min(100, Math.max(0, score));
+  }
+
+  private static extractExerciseId(exercise: Exercise): string | undefined {
+    return (exercise as any).exercise_id || (exercise as any).id;
+  }
+
+  private static buildWorkoutTimestamp(date?: string | Date | null, time?: string | Date | null) {
+    const normalizedDate = this.normalizeDateComponent(date);
+    if (!normalizedDate) {
+      return new Date().toISOString();
+    }
+    const normalizedTime = this.normalizeTimeComponent(time);
+    const safeTime = normalizedTime || '00:00';
+    const timeWithSeconds = /^\d{1,2}:\d{2}$/.test(safeTime) ? `${safeTime}:00` : safeTime;
+    const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(timeWithSeconds);
+    const isoCandidate = `${normalizedDate}T${hasTimezone ? timeWithSeconds : `${timeWithSeconds}Z`}`;
+    const parsed = new Date(isoCandidate);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date(`${normalizedDate}T00:00:00.000Z`).toISOString();
+    }
+    return parsed.toISOString();
+  }
+
+  private static normalizeDateComponent(value?: string | Date | null) {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        return trimmed;
+      }
+      const parsed = new Date(trimmed);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toISOString().slice(0, 10);
+    }
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return null;
+      return value.toISOString().slice(0, 10);
+    }
+    return null;
+  }
+
+  private static normalizeTimeComponent(value?: string | Date | null) {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      return trimmed;
+    }
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) return null;
+      return value.toISOString().slice(11, 19);
+    }
+    return null;
+  }
+
+  private static async publishWorkoutLoggedEvent(userId: string, exercise: Exercise): Promise<void> {
+    const workoutSessionId = this.extractExerciseId(exercise);
+    if (!workoutSessionId) {
+      logger.warn({ userId }, '[exercise-service] Missing exercise id, skip workout.logged event');
+      return;
+    }
+    const event = {
+      userId,
+      workoutSessionId,
+      startedAt: this.buildWorkoutTimestamp((exercise as any).exercise_date, (exercise as any).exercise_time),
+      durationMinutes: (exercise as any).duration_minutes ?? 0,
+      caloriesBurned: (exercise as any).calories_burned ?? 0,
+      workoutType: (exercise as any).exercise_type || 'unknown',
+    };
+    try {
+      await analyticsEventPublisher.publishWorkoutLogged(event);
+    } catch (error) {
+      logger.warn({ error, workoutSessionId, userId }, '[exercise-service] Failed to publish workout.logged event');
+    }
   }
 }

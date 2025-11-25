@@ -21,6 +21,12 @@ const TEMPLATE_MENU = [
     luong_calories: 520,
     khoi_luong: 450,
     description: 'Ức gà nướng với gạo lứt, bông cải và sốt chanh.',
+    price: 55000,
+    protein: 45,
+    carbs: 50,
+    fat: 15,
+    image_url:
+      'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?auto=format&fit=crop&w=800&q=80',
   },
   {
     ten_mon: 'Salmon Quinoa Salad',
@@ -28,6 +34,12 @@ const TEMPLATE_MENU = [
     luong_calories: 610,
     khoi_luong: 420,
     description: 'Cá hồi áp chảo với quinoa và salad rau củ.',
+    price: 75000,
+    protein: 40,
+    carbs: 55,
+    fat: 20,
+    image_url:
+      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80',
   },
   {
     ten_mon: 'Tofu Veggie Stir-fry',
@@ -35,6 +47,12 @@ const TEMPLATE_MENU = [
     luong_calories: 480,
     khoi_luong: 380,
     description: 'Đậu hũ xào rau củ sốt tương gừng.',
+    price: 52000,
+    protein: 25,
+    carbs: 60,
+    fat: 12,
+    image_url:
+      'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?auto=format&fit=crop&w=800&q=80&sat=-100',
   },
   {
     ten_mon: 'Beef Brown Rice Box',
@@ -42,6 +60,12 @@ const TEMPLATE_MENU = [
     luong_calories: 700,
     khoi_luong: 500,
     description: 'Thịt bò áp chảo ăn cùng cơm gạo lứt và rau hấp.',
+    price: 82000,
+    protein: 50,
+    carbs: 65,
+    fat: 25,
+    image_url:
+      'https://images.unsplash.com/photo-1484980972926-edee96e0960d?auto=format&fit=crop&w=800&q=80',
   },
   {
     ten_mon: 'Greek Yogurt Parfait',
@@ -49,6 +73,12 @@ const TEMPLATE_MENU = [
     luong_calories: 260,
     khoi_luong: 250,
     description: 'Sữa chua Hy Lạp với granola và trái cây theo mùa.',
+    price: 39000,
+    protein: 20,
+    carbs: 35,
+    fat: 8,
+    image_url:
+      'https://images.unsplash.com/photo-1528715471579-d1bcf0ba5e83?auto=format&fit=crop&w=800&q=80',
   },
 ] as const;
 

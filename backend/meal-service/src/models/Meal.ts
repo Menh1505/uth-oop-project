@@ -91,6 +91,10 @@ export interface MealTemplateDocument extends Document<string> {
   khoi_luong: number;
   description?: string | null;
   image_url?: string | null;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  price?: number;
   priority: number;
   created_at: Date;
   updated_at: Date;
@@ -104,6 +108,10 @@ export type MealTemplateDTO = {
   khoi_luong: number;
   description?: string | null;
   image_url?: string | null;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  price?: number;
   priority: number;
 };
 
@@ -184,6 +192,10 @@ const mealTemplateSchema = new Schema<MealTemplateDocument>(
     khoi_luong: { type: Number, required: true, min: 0 },
     description: { type: String, default: null },
     image_url: { type: String, default: null },
+    protein: { type: Number, default: 0 },
+    carbs: { type: Number, default: 0 },
+    fat: { type: Number, default: 0 },
+    price: { type: Number, default: 50000 },
     priority: { type: Number, default: 100, index: true },
   },
   {

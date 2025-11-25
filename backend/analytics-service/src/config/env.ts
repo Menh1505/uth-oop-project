@@ -11,7 +11,7 @@ export const config = {
   port: number(process.env.PORT, 8080),
   mongoUri:
     process.env.MONGO_URI ||
-    "mongodb://analytics:analytics@analytics-mongodb:27017/analytics_service?authSource=admin",
+    "mongodb://analytics:analytics@mongodb:27017/analytics_service?authSource=analytics_service",
   rabbitMq: {
     url: process.env.RABBITMQ_URL || "amqp://admin:admin@rabbitmq:5672",
     exchange: process.env.RABBITMQ_EXCHANGE || "fitfood.events",

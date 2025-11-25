@@ -10,6 +10,7 @@ import {
 } from '../models/Meal';
 import { MealRepository } from '../repositories/MealRepository';
 import { GoalServiceClient } from './GoalServiceClient';
+import { analyticsEventPublisher } from './AnalyticsEventPublisher';
 
 type MealResponse = {
   meal: MealDTO;
@@ -25,6 +26,7 @@ export class MealService {
     const normalized = this.normalizeCreatePayload(payload);
     const meal = await MealRepository.createMeal(userId, normalized);
     logger.info({ userId, mealId: meal.id }, '[meal-service] Inserted meal');
+    await this.publishMealLoggedEvent(userId, meal);
     const summary = await this.syncDailySummary(userId, normalized.ngay_an, authHeader);
     return { meal, summary };
   }
@@ -83,6 +85,38 @@ export class MealService {
 
   static async listTemplates(): Promise<MealTemplateDTO[]> {
     return MealRepository.listTemplates();
+  }
+
+  static async listMenuItems() {
+    const templates = await MealRepository.listTemplates();
+    return templates.map((tpl) => ({
+      id: tpl.id,
+      name: tpl.ten_mon,
+      description: tpl.description ?? null,
+      calories: tpl.luong_calories,
+      protein: tpl.protein ?? 0,
+      carbs: tpl.carbs ?? 0,
+      fat: tpl.fat ?? 0,
+      price: tpl.price ?? 0,
+      image_url: tpl.image_url ?? null,
+      meal_type: tpl.loai_bua_an,
+    }));
+  }
+
+  static async addMenuItemToCart(mealId: string, quantity = 1) {
+    const template = await MealRepository.findTemplateById(mealId);
+    if (!template) {
+      throw new Error('Không tìm thấy món ăn');
+    }
+    const qty = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+    const price = template.price ?? 0;
+    logger.info({ mealId, qty }, '[meal-service] Menu item added to cart');
+    return {
+      meal_id: template.id,
+      quantity: qty,
+      price,
+      total: price * qty,
+    };
   }
 
   private static normalizeCreatePayload(payload: CreateMealEntryPayload): CreateMealEntryPayload {
@@ -228,4 +262,32 @@ export class MealService {
   }
 
   private static allowedMealTypes: LoaiBuaAn[] = ['Bữa sáng', 'Bữa trưa', 'Bữa tối', 'Ăn vặt'];
+
+  private static buildLoggedAt(date: string, time?: string | null) {
+    const safeTime = time?.trim() || '00:00';
+    const normalized = safeTime.length === 5 ? `${safeTime}:00` : safeTime;
+    const isoCandidate = `${date}T${normalized.endsWith('Z') ? normalized : `${normalized}Z`}`;
+    const parsed = new Date(isoCandidate);
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date(`${date}T00:00:00.000Z`).toISOString();
+    }
+    return parsed.toISOString();
+  }
+
+  private static async publishMealLoggedEvent(userId: string, meal: MealDTO) {
+    const event = {
+      userId,
+      mealId: meal.id,
+      loggedAt: this.buildLoggedAt(meal.ngay_an, meal.thoi_gian_an),
+      totalCalories: meal.luong_calories,
+      proteinGrams: 0,
+      carbsGrams: 0,
+      fatsGrams: 0,
+    };
+    try {
+      await analyticsEventPublisher.publishMealLogged(event);
+    } catch (error) {
+      logger.warn({ error, mealId: meal.id, userId }, '[meal-service] Failed to publish meal.logged event');
+    }
+  }
 }
