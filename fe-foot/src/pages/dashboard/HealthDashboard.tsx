@@ -8,6 +8,8 @@ import type {
   HealthSummaryResponse,
   WorkoutWeekSummary,
 } from "../../types/analytics";
+import type { Exercise } from "../../types";
+import { getDailyExerciseSummary } from "../../lib/api/exerciseApi";
 
 const RANGE_OPTIONS = [
   { value: "7d", label: "7 ngày" },
@@ -29,13 +31,15 @@ type ChartPoint = {
 };
 
 export default function HealthDashboard() {
-  const { profile } = useAppStore();
+  const { profile, fetchMeals } = useAppStore();
   const userId = profile?.user_id;
   const [range, setRange] = useState<RangeValue>("7d");
   const [healthSummary, setHealthSummary] = useState<HealthSummaryResponse | null>(null);
   const [habitScore, setHabitScore] = useState<HabitScoreResponse | null>(null);
+  const [dailyWorkout, setDailyWorkout] = useState<DailyExerciseSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -46,21 +50,40 @@ export default function HealthDashboard() {
         setError(null);
         const today = new Date();
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const [healthRes, habitRes] = await Promise.all([
-          ApiClient.get<HealthSummaryResponse>(
-            `/analytics/users/${userId}/health-summary?range=${range}`
-          ),
+        const todayKey = formatDateForApi(today);
+        const [healthRes, habitRes, workoutRes] = await Promise.all([
+          ApiClient.get<HealthSummaryResponse>(`/analytics/users/${userId}/health-summary?range=${range}`),
           ApiClient.get<HabitScoreResponse>(
-            `/analytics/users/${userId}/habit-score?from=${formatDateForApi(
-              startOfMonth
-            )}&to=${formatDateForApi(today)}`
+            `/analytics/users/${userId}/habit-score?from=${formatDateForApi(startOfMonth)}&to=${formatDateForApi(
+              today
+            )}`
           ),
+          ApiClient.get<DailyExerciseSummary>(`/exercises/summary/daily?date=${todayKey}`),
         ]);
         setHealthSummary(healthRes);
         setHabitScore(habitRes);
+        setDailyWorkout(workoutRes);
+        setUsingFallback(false);
       } catch (err) {
         console.error("Health dashboard error", err);
-        setError(err instanceof Error ? err.message : "Không thể tải dữ liệu");
+        const fallback = await buildLocalRangeSummary({
+          range,
+          fetchMeals,
+          workoutState: dailyWorkout,
+        });
+        if (fallback) {
+          setHealthSummary(fallback.health);
+          setHabitScore(fallback.habit);
+          setDailyWorkout(fallback.workout);
+          setError("Đang hiển thị dữ liệu tổng hợp từ nhật ký bữa ăn/buổi tập.");
+          setUsingFallback(true);
+        } else {
+          setError("Không thể tải dữ liệu. Vui lòng kiểm tra backend/gateway.");
+          setHealthSummary(null);
+          setHabitScore(null);
+          setDailyWorkout(null);
+          setUsingFallback(false);
+        }
       } finally {
         setLoading(false);
       }
@@ -138,7 +161,33 @@ export default function HealthDashboard() {
           <p className="text-sm text-gray-500">Đang đồng bộ dữ liệu phân tích…</p>
         </Card>
       ) : (
-        <>
+        <div className="grid gap-4">
+          <WorkoutSummaryCard
+            summary={dailyWorkout}
+            usingFallback={usingFallback}
+            rangeMeta={
+              usingFallback && healthSummary
+                ? {
+                    from: healthSummary.from,
+                    to: healthSummary.to,
+                    totalDuration: healthSummary.daily.reduce(
+                      (s, d: any) => s + Number((d as any).workoutDurationMinutes || 0),
+                      0
+                    ),
+                    totalCalories: healthSummary.daily.reduce(
+                      (s, d) => s + Number((d as any).caloriesOut || 0),
+                      0
+                    ),
+                    totalSessions: healthSummary.daily.reduce(
+                      (s, d) => s + Number((d as any).workoutsLoggedCount || 0),
+                      0
+                    ),
+                    days: healthSummary.daily.length,
+                  }
+                : null
+            }
+          />
+
           {summaryCards.length ? (
             <section className="grid gap-4 md:grid-cols-3">
               {summaryCards.map((card) => (
@@ -173,7 +222,7 @@ export default function HealthDashboard() {
             )}
           </Card>
 
-          <section className="grid gap-4 md:grid-cols-2">
+          <section className="grid gap-4 lg:grid-cols-2">
             <Card title="Health Score">
               {healthScoreChart.length ? (
                 <LineChart
@@ -185,26 +234,7 @@ export default function HealthDashboard() {
                 <EmptyState message="Chưa có điểm sức khỏe." />
               )}
             </Card>
-            <Card title="Weight Trend">
-              {weightTrendChart.length ? (
-                <LineChart
-                  data={weightTrendChart}
-                  series={[{ key: "weight", label: "Cân nặng (kg)", color: "#0ea5e9" }]}
-                />
-              ) : (
-                <EmptyState message="Chưa ghi nhận cân nặng trong thời gian này." />
-              )}
-            </Card>
-          </section>
 
-          <section className="grid gap-4 md:grid-cols-2">
-            <Card title="Workout Sessions / Tuần">
-              {workoutWeekly.length ? (
-                <WorkoutBarChart data={workoutWeekly} />
-              ) : (
-                <EmptyState message="Chưa có buổi tập nào được ghi nhận." />
-              )}
-            </Card>
             <Card title="Macro Breakdown">
               {macro ? (
                 <MacroBreakdown macro={macro} />
@@ -214,7 +244,7 @@ export default function HealthDashboard() {
             </Card>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2">
+          <section className="grid gap-4 lg:grid-cols-2">
             <Card title="Thói quen nổi bật">
               {habitScore?.daily?.length ? (
                 <HabitHighlights habits={habitScore} />
@@ -237,7 +267,7 @@ export default function HealthDashboard() {
               )}
             </Card>
           </section>
-        </>
+        </div>
       )}
     </div>
   );
@@ -284,25 +314,37 @@ function LineChart({
           className="h-full w-full"
         >
           {series.map((serie) => {
-            const path = data
-              .map((point, idx) => {
-                const x = data.length === 1 ? width / 2 : (idx / (data.length - 1)) * width;
-                const value = Number(point[serie.key] ?? 0);
-                const y = height - ((value - adjustedMin) / range) * height;
-                return `${x},${y}`;
-              })
-              .join(" ");
+            const points = data.map((point, idx) => {
+              const x = data.length === 1 ? width / 2 : (idx / (data.length - 1)) * width;
+              const value = Number(point[serie.key] ?? 0);
+              const y = height - ((value - adjustedMin) / range) * height;
+              return { x, y, value };
+            });
+            const path = points.map((p) => `${p.x},${p.y}`).join(" ");
             return (
-              <polyline
-                key={serie.key}
-                fill="none"
-                stroke={serie.color}
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points={path}
-                opacity={0.9}
-              />
+              <g key={serie.key}>
+                <polyline
+                  fill="none"
+                  stroke={serie.color}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={path}
+                  opacity={0.9}
+                />
+                {points.map((p, idx) => (
+                  <circle
+                    key={`${serie.key}-${idx}`}
+                    cx={p.x}
+                    cy={p.y}
+                    r={3.5}
+                    fill={serie.color}
+                    stroke="white"
+                    strokeWidth={1}
+                    opacity={0.95}
+                  />
+                ))}
+              </g>
             );
           })}
         </svg>
@@ -325,18 +367,20 @@ function LineChart({
 }
 
 function WorkoutBarChart({ data }: { data: WorkoutWeekSummary[] }) {
-  const maxSessions = Math.max(...data.map((d) => d.sessions), 1);
+  if (!data.length) return <EmptyState message="Chưa có buổi tập nào được ghi nhận." />;
+  const maxSessions = Math.max(...data.map((d) => d.sessions || 0), 1);
   return (
     <div className="flex h-56 items-end justify-between gap-3">
       {data.map((week) => {
-        const heightPercent = (week.sessions / maxSessions) * 100;
+        const safeSessions = week.sessions || 0;
+        const heightPercent = (safeSessions / maxSessions) * 100;
         return (
           <div key={week.weekStart} className="flex-1 text-center">
             <div className="rounded-t-lg bg-blue-500" style={{ height: `${heightPercent}%` }} />
             <p className="mt-2 text-xs font-medium text-gray-600">
               {formatWeekLabel(week.weekStart)}
             </p>
-            <p className="text-xs text-gray-500">{week.sessions} buổi</p>
+            <p className="text-xs text-gray-500">{safeSessions} buổi</p>
           </div>
         );
       })}
@@ -346,6 +390,10 @@ function WorkoutBarChart({ data }: { data: WorkoutWeekSummary[] }) {
 
 function MacroBreakdown({ macro }: { macro: HealthSummaryResponse["macroBreakdown"] }) {
   const total = macro.proteinPercentage + macro.carbPercentage + macro.fatPercentage;
+  const hasData = total > 0 || macro.proteinGrams + macro.carbGrams + macro.fatGrams > 0;
+  if (!hasData) {
+    return <EmptyState message="Chưa có dữ liệu macro." />;
+  }
   return (
     <div className="space-y-4">
       <div className="flex h-4 overflow-hidden rounded-full bg-gray-100">
@@ -478,4 +526,387 @@ function formatWeekLabel(dateStr: string) {
     "vi-VN",
     { day: "2-digit", month: "2-digit" }
   )}`;
+}
+
+async function buildLocalRangeSummary({
+  range,
+  fetchMeals,
+  workoutState,
+}: {
+  range: RangeValue;
+  fetchMeals: (date?: string) => Promise<any>;
+  workoutState: DailyExerciseSummary | null;
+}) {
+  const days =
+    range === "90d" ? 90
+    : range === "30d" ? 30
+    : 7;
+
+  const today = new Date();
+  const dateKeys = Array.from({ length: days }, (_, idx) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - idx);
+    return formatDateForApi(d);
+  }).reverse();
+
+  const dailyData: HealthSummaryResponse["daily"] = [];
+  let workoutsPerWeek: WorkoutWeekSummary[] = [];
+  let fallbackWorkoutToday: DailyExerciseSummary | null = workoutState;
+
+  for (const dateKey of dateKeys) {
+    const [mealSummary, workoutSummary] = await Promise.all([
+      fetchMealSummary(dateKey),
+      getDailyExerciseSummary(dateKey).catch(() => null),
+    ]);
+
+    if (!fallbackWorkoutToday && dateKey === dateKeys[dateKeys.length - 1]) {
+      fallbackWorkoutToday = workoutSummary;
+    }
+
+    const caloriesIn = mealSummary?.tong_calo ?? 0;
+    const caloriesOut =
+      workoutSummary?.total_calories_burned ??
+      workoutSummary?.total_calories ??
+      0;
+    const calorieTarget = mealSummary?.calo_muc_tieu ?? 0;
+    const healthScore =
+      caloriesIn && calorieTarget
+        ? Math.max(0, Math.min(100, (caloriesIn / calorieTarget) * 100))
+        : 0;
+
+    dailyData.push({
+      date: dateKey,
+      caloriesIn,
+      caloriesOut,
+      calorieBalance: caloriesIn - (calorieTarget || caloriesIn),
+      calorieTarget: calorieTarget || caloriesIn,
+      mealsLoggedCount: (mealSummary?.meals || []).length || 0,
+      workoutsLoggedCount: workoutSummary?.sessions?.length || 0,
+      ...estimateMacroFromCalories(caloriesIn || calorieTarget || 0),
+      healthScore: computeHealthScore(
+        caloriesIn,
+        calorieTarget,
+        workoutSummary?.sessions?.length || 0
+      ),
+    });
+
+    if (workoutSummary) {
+      const weekStart = getWeekStart(dateKey);
+      const existing = workoutsPerWeek.find((w) => w.weekStart === weekStart);
+      const sessions = workoutSummary.sessions?.length || 0;
+      const minutes =
+        (workoutSummary.total_duration as number | undefined) ??
+        workoutSummary.total_duration_minutes ??
+        0;
+      if (existing) {
+        existing.sessions += sessions;
+        existing.minutes += minutes;
+      } else {
+        workoutsPerWeek.push({ weekStart, sessions, minutes });
+      }
+
+      // Store per-day workout minutes to display later
+      const last = dailyData[dailyData.length - 1];
+      if (last) {
+        (last as any).workoutDurationMinutes = minutes;
+        (last as any).workoutSessions = sessions;
+      }
+    }
+  }
+
+  if (!dailyData.length) return null;
+
+  const avg = <T extends keyof HealthSummaryResponse["daily"][number]>(key: T) =>
+    dailyData.reduce((s, d) => s + Number(d[key] || 0), 0) / dailyData.length;
+
+  const health: HealthSummaryResponse = {
+    userId: "local",
+    from: dailyData[0].date,
+    to: dailyData[dailyData.length - 1].date,
+    daily: dailyData,
+    averages: {
+      caloriesIn: avg("caloriesIn"),
+      caloriesOut: avg("caloriesOut"),
+      calorieBalance: avg("calorieBalance"),
+      healthScore: avg("healthScore"),
+    },
+    macroBreakdown: {
+      proteinPercentage: avg("proteinPercentage"),
+      carbPercentage: avg("carbPercentage"),
+      fatPercentage: avg("fatPercentage"),
+      proteinGrams: avg("proteinGrams"),
+      carbGrams: avg("carbGrams"),
+      fatGrams: avg("fatGrams"),
+    },
+    workoutSessionsPerWeek: workoutsPerWeek,
+    insights: buildInsights(healthSummaryDraft(dailyData)),
+    weightTrend: [],
+  };
+
+  const habit: HabitScoreResponse = {
+    userId: "local",
+    from: health.from,
+    to: health.to,
+    daily: dailyData.map((d) => ({
+      date: d.date,
+      healthScore: d.healthScore,
+      mealLoggingStreakDays: d.mealsLoggedCount ? 1 : 0,
+      workoutLoggingStreakDays: d.workoutsLoggedCount ? 1 : 0,
+    })),
+    summary: {
+      averageHealthScore: health.averages.healthScore,
+      bestDay: dailyData
+        .slice()
+        .sort((a, b) => b.healthScore - a.healthScore)[0],
+      worstDay: dailyData
+        .slice()
+        .sort((a, b) => a.healthScore - b.healthScore)[0],
+      mealLoggingStreakDays: dailyData.filter((d) => d.mealsLoggedCount > 0).length,
+      workoutLoggingStreakDays: dailyData.filter((d) => d.workoutsLoggedCount > 0).length,
+    },
+  };
+
+  const workoutSummary: DailyExerciseSummary | null = fallbackWorkoutToday
+    ? {
+        ...fallbackWorkoutToday,
+        total_duration_minutes:
+          (fallbackWorkoutToday as any).total_duration ??
+          fallbackWorkoutToday.total_duration_minutes ??
+          0,
+        total_calories_burned:
+          (fallbackWorkoutToday as any).total_calories ??
+          fallbackWorkoutToday.total_calories_burned ??
+          0,
+      }
+    : null;
+
+  return { health, habit, workout: workoutSummary };
+}
+
+async function fetchMealSummary(date: string) {
+  try {
+    const payload = await ApiClient.get<any>(`/meals/me?date=${date}`);
+    const body = (payload as any)?.data ?? payload;
+    return body?.summary
+      ? { ...body.summary, meals: body.meals || [] }
+      : body;
+  } catch (error) {
+    console.warn("fetchMealSummary fallback error", error);
+    return null;
+  }
+}
+
+function getWeekStart(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00Z`);
+  const day = date.getUTCDay();
+  const diff = (day + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - diff);
+  const year = date.getUTCFullYear();
+  const month = `${date.getUTCMonth() + 1}`.padStart(2, "0");
+  const dayString = `${date.getUTCDate()}`.padStart(2, "0");
+  return `${year}-${month}-${dayString}`;
+}
+
+function computeHealthScore(caloriesIn: number, calorieTarget: number, workouts: number) {
+  if (!caloriesIn) return workouts > 0 ? 40 : 20;
+  const target = calorieTarget || caloriesIn || 1;
+  const ratio = caloriesIn / target;
+  // Score drops as you deviate from target; add small bonus for workouts
+  const base = Math.max(0, 100 - Math.abs(1 - ratio) * 100);
+  const bonus = workouts > 0 ? 5 : 0;
+  return Math.min(100, base + bonus);
+}
+
+function estimateMacroFromCalories(calories: number) {
+  // Default ratio 30/45/25
+  const proteinPct = 30;
+  const carbPct = 45;
+  const fatPct = 25;
+  return {
+    proteinPercentage: proteinPct,
+    carbPercentage: carbPct,
+    fatPercentage: fatPct,
+    proteinGrams: (calories * (proteinPct / 100)) / 4,
+    carbGrams: (calories * (carbPct / 100)) / 4,
+    fatGrams: (calories * (fatPct / 100)) / 9,
+  };
+}
+
+function healthSummaryDraft(daily: HealthSummaryResponse["daily"]) {
+  const caloriesInAvg = daily.reduce((s, d) => s + (d.caloriesIn || 0), 0) / daily.length;
+  const caloriesTargetAvg = daily.reduce((s, d) => s + (d.calorieTarget || 0), 0) / daily.length;
+  const workoutDays = daily.filter((d) => (d.workoutsLoggedCount || 0) > 0).length;
+  return { caloriesInAvg, caloriesTargetAvg, workoutDays };
+}
+
+function buildInsights(meta: { caloriesInAvg: number; caloriesTargetAvg: number; workoutDays: number }) {
+  const insights: string[] = [];
+  if (meta.caloriesTargetAvg) {
+    const delta = meta.caloriesInAvg - meta.caloriesTargetAvg;
+    if (delta > 100) insights.push("Bạn đang ăn cao hơn mục tiêu, cân nhắc giảm khẩu phần hoặc tăng vận động.");
+    else if (delta < -100) insights.push("Bạn đang ăn thấp hơn mục tiêu, chú ý nạp đủ năng lượng cho phục hồi.");
+    else insights.push("Lượng calorie gần mục tiêu, tiếp tục duy trì.");
+  }
+  insights.push(
+    meta.workoutDays >= 3
+      ? "Bạn đang duy trì luyện tập tốt (>=3 ngày trong giai đoạn chọn)."
+      : "Tăng số ngày luyện tập để đạt hiệu quả tốt hơn."
+  );
+  return insights;
+}
+
+type DailyExerciseSummary = {
+  date: string;
+  total_exercises?: number;
+  total_duration_minutes?: number;
+  total_calories_burned?: number;
+  exercise_types?: string[];
+  exercises?: (Partial<Exercise> & {
+    exercise_name: string;
+    duration_minutes?: number;
+    calories_burned?: number;
+    exercise_time?: string;
+    notes?: string | null;
+    intensity?: string | null;
+  })[];
+};
+
+function WorkoutSummaryCard({
+  summary,
+  usingFallback,
+  rangeMeta,
+}: {
+  summary: DailyExerciseSummary | null;
+  usingFallback: boolean;
+  rangeMeta: {
+    from: string;
+    to: string;
+    totalDuration: number;
+    totalCalories: number;
+    totalSessions: number;
+    days: number;
+  } | null;
+}) {
+  if (!summary && !rangeMeta) return null;
+
+  const isRange = usingFallback && rangeMeta;
+  const duration = Math.round(
+    isRange ? rangeMeta!.totalDuration : summary?.total_duration_minutes ?? 0
+  );
+  const calories = Math.round(
+    isRange ? rangeMeta!.totalCalories : summary?.total_calories_burned ?? 0
+  );
+  const days = isRange ? rangeMeta!.days : 1;
+  const targetCalories = 500 * days;
+  const progress = targetCalories > 0 ? Math.min(100, Math.round((calories / targetCalories) * 100)) : 0;
+  const status =
+    calories >= targetCalories * 0.9
+      ? { label: "Tốt", color: "bg-emerald-100 text-emerald-700" }
+      : { label: "Cần bổ sung", color: "bg-amber-100 text-amber-700" };
+
+  const sessions = isRange
+    ? []
+    : [...(summary?.exercises || [])].sort((a, b) => {
+        const ta = (a.exercise_time || "").toString();
+        const tb = (b.exercise_time || "").toString();
+        return tb.localeCompare(ta);
+      });
+
+  return (
+    <Card title={isRange ? "Tổng quan buổi tập (theo khoảng)" : "Tổng quan buổi tập trong ngày"}>
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          {isRange ? "Khoảng đang theo dõi" : "Ngày đang theo dõi"}
+        </p>
+        <p className="text-lg font-semibold text-gray-900">
+          {isRange ? `${rangeMeta!.from} → ${rangeMeta!.to}` : summary?.date}
+        </p>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatPill label="Thời lượng" value={`${duration} phút`} />
+          <StatPill label="Calories" value={`${calories} kcal`} />
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-sm text-gray-600">
+            {isRange ? `Tiến độ calories (tổng ${days} ngày)` : "Tiến độ calories"}
+          </p>
+          <div className="h-2 rounded-full bg-gray-100">
+            <div
+              className="h-2 rounded-full bg-gradient-to-r from-pink-500 to-amber-400 transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            {calories}/{targetCalories} kcal
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 text-sm">
+          <div className="font-semibold text-gray-800">Trạng thái</div>
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${status.color}`}>
+            {status.label}
+          </span>
+        </div>
+
+        {isRange ? (
+          <div className="text-sm text-gray-700">
+            {rangeMeta!.totalSessions} buổi trong {rangeMeta!.days} ngày.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-gray-800">Timeline buổi tập</p>
+            {sessions.length ? (
+              <ul className="space-y-3">
+                {sessions.map((s, idx) => (
+                  <li key={`${s.exercise_name}-${idx}`} className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-1 inline-block h-3 w-3 rounded-full border-2 border-gray-800" />
+                      <div>
+                        <p className="font-semibold text-gray-900">{s.exercise_name}</p>
+                        <p className="text-xs text-gray-600">
+                          {renderDuration(s.duration_minutes)} • {renderCalories(s.calories_burned)}
+                        </p>
+                        {s.notes && <p className="text-xs text-gray-500">{s.notes}</p>}
+                      </div>
+                    </div>
+                    <p className="text-xs font-medium text-gray-700">{renderTime(s.exercise_time)}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState message="Chưa có buổi tập nào trong ngày." />
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function StatPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-gray-50 px-4 py-3">
+      <p className="text-xs uppercase text-gray-500">{label}</p>
+      <p className="text-2xl font-semibold text-gray-900">{value}</p>
+    </div>
+  );
+}
+
+function renderDuration(min?: number) {
+  if (!min) return "0 phút";
+  return `${min} phút`;
+}
+
+function renderCalories(kcal?: number) {
+  if (!kcal) return "0 kcal";
+  return `${kcal} kcal`;
+}
+
+function renderTime(time?: string) {
+  if (!time) return "";
+  // Accept HH:MM[:SS]
+  const [h, m] = time.split(":");
+  if (!h || !m) return time;
+  return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
 }
