@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { queryService } from "../services/queryService.js";
 import { logger } from "../utils/logger.js";
+import { ensureDemoData } from "../services/demoDataService.js";
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.get(healthPaths, async (req, res) => {
     const { userId } = req.params;
     const { range, from, to } = req.query as Record<string, string | undefined>;
     const { start, end } = resolveRange(range, from, to);
+    await ensureDemoData(userId, start, end);
     const data = await queryService.getHealthSummary(userId, start, end);
     res.json(data);
   } catch (error) {
@@ -32,6 +34,7 @@ router.get(habitPaths, async (req, res) => {
     const { from, to } = req.query as Record<string, string | undefined>;
     const start = from && isValidDate(from) ? from : getDateKeyDaysAgo(30);
     const end = to && isValidDate(to) ? to : getTodayKey();
+    await ensureDemoData(userId, start, end);
     const data = await queryService.getHabitScore(userId, start, end);
     res.json(data);
   } catch (error) {

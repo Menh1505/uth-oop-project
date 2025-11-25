@@ -6,7 +6,11 @@ import { logger } from "./utils/logger.js";
 
 async function bootstrap() {
   await connectMongo();
-  await rabbitConsumer.start();
+  try {
+    await rabbitConsumer.start();
+  } catch (error) {
+    logger.warn({ error }, "RabbitMQ unavailable - running in read-only mode");
+  }
 
   const app = createApp();
   app.listen(config.port, () => {

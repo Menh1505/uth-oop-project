@@ -22,4 +22,9 @@ export const config = {
       body: process.env.RABBITMQ_BODY_QUEUE || "analytics.bodymetrics.updated.q",
     },
   },
+  demoData: {
+    enabled: (process.env.ENABLE_DEMO_DATA || "true").toLowerCase() === "true",
+    maxDays: number(process.env.DEMO_DATA_MAX_DAYS, 30),
+    startWeight: number(process.env.DEMO_DATA_START_WEIGHT, 70),
+  },
 };
