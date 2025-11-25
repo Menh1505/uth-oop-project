@@ -87,9 +87,7 @@ const deriveBmiFromProfile = (
     return { value: null, category: null };
   }
 
-  const computed = Number(
-    (weight / Math.pow(height / 100, 2)).toFixed(1)
-  );
+  const computed = Number((weight / Math.pow(height / 100, 2)).toFixed(1));
   return { value: computed, category: categorizeBmi(computed) };
 };
 
@@ -111,9 +109,18 @@ export default function ProfileModal({
   const [userGoal, setUserGoal] = useState<UserGoalSummary | null>(null);
   const [goalLoading, setGoalLoading] = useState(false);
   const [goalError, setGoalError] = useState<string | null>(null);
+
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  const [walletBalance, setWalletBalance] = useState<{
+    amount: number;
+    currency: string;
+    lastUpdated: string;
+  } | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletError, setWalletError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: profile?.name || "",
@@ -122,8 +129,9 @@ export default function ProfileModal({
     bio: (profile as any)?.bio || "",
   });
 
-  // Toggle panel mục tiêu trái
+  // Panel trái/phải
   const [showGoals, setShowGoals] = useState(true);
+  const [showWalletPanel, setShowWalletPanel] = useState(true);
 
   // Khi prop profile đổi, sync lại form
   useEffect(() => {
@@ -163,9 +171,7 @@ export default function ProfileModal({
       const res: any = await ApiClient.get(`/meals/me?date=${targetDate}`);
       const summary =
         res?.summary ??
-        (res?.data && typeof res.data === "object"
-          ? res.data.summary
-          : null);
+        (res?.data && typeof res.data === "object" ? res.data.summary : null);
       setDailySummary(summary ?? null);
     } catch (err: any) {
       console.error("ProfileModal balance fetch failed:", err);
@@ -173,6 +179,33 @@ export default function ProfileModal({
       setSummaryError(err?.message || "Không thể tải dữ liệu calories");
     } finally {
       setSummaryLoading(false);
+    }
+  };
+
+  const fetchWalletBalance = async () => {
+    setWalletLoading(true);
+    setWalletError(null);
+    try {
+      const res: any = await ApiClient.get("/payments/balance");
+      const payload = res?.balance ?? res;
+      if (payload && typeof payload === "object") {
+        setWalletBalance({
+          amount: Number(payload.amount) || 0,
+          currency: payload.currency || "VND",
+          lastUpdated:
+            typeof payload.lastUpdated === "string"
+              ? payload.lastUpdated
+              : new Date().toISOString(),
+        });
+      } else {
+        setWalletBalance(null);
+      }
+    } catch (err: any) {
+      console.error("ProfileModal wallet fetch failed:", err);
+      setWalletBalance(null);
+      setWalletError(err?.message || "Không thể tải số dư ví");
+    } finally {
+      setWalletLoading(false);
     }
   };
 
@@ -216,9 +249,7 @@ export default function ProfileModal({
         });
       } catch (err) {
         console.error("ProfileModal hydrate failed:", err);
-        if (active) {
-          setError("Không thể tải hồ sơ từ server");
-        }
+        if (active) setError("Không thể tải hồ sơ từ server");
       } finally {
         if (active) setFetching(false);
       }
@@ -227,6 +258,7 @@ export default function ProfileModal({
     hydrateFromApi();
     fetchUserGoal();
     fetchDailySummary();
+    fetchWalletBalance();
     return () => {
       active = false;
     };
@@ -253,10 +285,7 @@ export default function ProfileModal({
         "Số giờ tập mỗi ngày (0.5, 1, 1.5, 2)",
         "1"
       );
-      const weeks = window.prompt(
-        "Thời gian đạt mục tiêu (tuần)",
-        "8"
-      );
+      const weeks = window.prompt("Thời gian đạt mục tiêu (tuần)", "8");
 
       if (!currentWeight || !targetWeight || !hours || !weeks) return;
 
@@ -310,9 +339,9 @@ export default function ProfileModal({
   };
 
   if (!isOpen) return null;
-  // Ưu tiên dữ liệu từ server, fallback về profile prop
   const displayProfile = (serverProfile || profile) as CombinedProfile | null;
   if (!displayProfile) return null;
+
   const { value: bmiValue, category: bmiCategory } =
     deriveBmiFromProfile(displayProfile);
 
@@ -362,6 +391,7 @@ export default function ProfileModal({
     displayProfile.fitness_goal ||
     (displayProfile as any).goal ||
     "Chưa đặt mục tiêu";
+
   const consumedCalories =
     typeof dailySummary?.tong_calo === "number" &&
     Number.isFinite(dailySummary.tong_calo)
@@ -408,6 +438,18 @@ export default function ProfileModal({
       ? null
       : `${balanceValue >= 0 ? "+" : ""}${balanceValue} kcal`;
 
+  const walletFormattedAmount = walletBalance
+    ? new Intl.NumberFormat("vi-VN", {
+        style: "currency",
+        currency: walletBalance.currency || "VND",
+      }).format(walletBalance.amount)
+    : null;
+  const walletLastUpdatedLabel = walletBalance?.lastUpdated
+    ? new Date(walletBalance.lastUpdated).toLocaleString("vi-VN", {
+        hour12: false,
+      })
+    : null;
+
   return (
     <>
       {/* Backdrop */}
@@ -418,7 +460,7 @@ export default function ProfileModal({
 
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-start justify-center px-4 py-6">
-        <div className="mt-8 w-full max-w-4xl rounded-3xl border border-slate-800 bg-slate-900/95 text-slate-50 shadow-2xl shadow-black/60 flex flex-col">
+        <div className="mt-8 w-full max-w-5xl rounded-3xl border border-slate-800 bg-slate-900/95 text-slate-50 shadow-2xl shadow-black/60 flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/90 px-5 py-3">
             <div>
@@ -437,7 +479,7 @@ export default function ProfileModal({
             </button>
           </div>
 
-          {/* Body: 2 cột */}
+          {/* Body */}
           <div className="px-5 py-4">
             {error && (
               <div className="mb-3 flex items-start gap-2 rounded-2xl border border-red-500/40 bg-red-500/10 px-3 py-2.5 text-xs text-red-100">
@@ -446,10 +488,10 @@ export default function ProfileModal({
               </div>
             )}
 
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* LEFT: Goals panel */}
+            <div className="flex flex-col md:flex-row md:items-stretch gap-4">
+              {/* LEFT panel: Goals */}
               {showGoals && (
-                <div className="md:w-[40%] w-full rounded-2xl border border-slate-800/70 bg-slate-900/80 px-3.5 py-3 space-y-3">
+                <div className="w-full md:w-72 rounded-2xl border border-slate-800/70 bg-slate-900/80 px-3.5 py-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <p className="text-[11px] font-semibold uppercase text-slate-300 tracking-wide">
@@ -544,374 +586,449 @@ export default function ProfileModal({
                 </div>
               )}
 
-              {/* Toggle giữa 2 panel – chỉ hiện trên md+ */}
-              <div className="hidden md:flex items-center">
-                <button
-                  type="button"
-                  onClick={() => setShowGoals((v) => !v)}
-                  className="h-10 w-7 flex items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 text-xs"
-                >
-                  {showGoals ? "<|" : "|>"}
-                </button>
-              </div>
-
-              {/* RIGHT: Profile info */}
-              <div
-                className={`flex-1 rounded-2xl border border-slate-800/70 bg-slate-900/80 px-4 py-3 space-y-4 ${
-                  !showGoals ? "md:w-full" : "md:w-[60%]"
-                }`}
-              >
-                {/* Avatar + nút edit */}
-                <div className="flex items-start gap-3 border-b border-slate-800/70 pb-3">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-400 via-sky-500 to-indigo-500 p-[3px] shadow-lg shadow-emerald-500/30">
-                      <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
-                        {avatarUrl ? (
-                          <img
-                            src={avatarUrl}
-                            alt={displayProfile.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="text-xl">👤</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 pl-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-50">
-                          {displayProfile.name}
-                        </div>
-                        <div className="mt-0.5 text-xs text-slate-400">
-                          {displayProfile.email}
+              {/* CENTER: Profile card + hai nút <| |> */}
+              <div className="relative flex-1 mx-auto md:max-w-2xl w-full">
+                <div className="rounded-2xl border border-slate-800/70 bg-slate-900/80 px-5 py-4 space-y-4">
+                  {/* Avatar + nút edit */}
+                  <div className="flex items-start gap-3 border-b border-slate-800/70 pb-3">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-400 via-sky-500 to-indigo-500 p-[3px] shadow-lg shadow-emerald-500/30">
+                        <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt={displayProfile.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-xl">👤</div>
+                          )}
                         </div>
                       </div>
-                      {!isEditing && (
-                        <Button
-                          type="button"
-                          onClick={() => setIsEditing(true)}
-                          className="h-8 rounded-xl px-3 text-xs font-medium bg-sky-500 hover:bg-sky-400"
-                          disabled={fetching}
-                        >
-                          {fetching ? "Đang tải..." : "Chỉnh sửa"}
-                        </Button>
-                      )}
                     </div>
 
-                    <div className="mt-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-2.5 py-1.5">
-                      <div className="text-[10px] font-medium uppercase text-slate-200 tracking-wide">
-                        Mục tiêu
-                      </div>
-                      <div className="mt-0.5 text-xs font-semibold text-sky-200 capitalize line-clamp-1">
-                        {goalText}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Info */}
-                {isEditing ? (
-                  // EDIT MODE
-                  <div className="space-y-2">
-                    <label className="block space-y-1.5">
-                      <div className="text-[11px] font-medium tracking-wide text-slate-300 uppercase">
-                        Tên
-                      </div>
-                      <Input
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        placeholder="Tên của bạn"
-                        className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
-                      />
-                    </label>
-
-                    <label className="block space-y-1.5">
-                      <div className="text-[11px] font-medium tracking-wide text-slate-300 uppercase">
-                        Email
-                      </div>
-                      <Input
-                        name="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        placeholder="email@example.com"
-                        className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
-                      />
-                    </label>
-
-                    <label className="block space-y-1.5">
-                      <div className="text-[11px] font-medium tracking-wide text-slate-300 uppercase">
-                        Số điện thoại
-                      </div>
-                      <Input
-                        name="phone"
-                        type="tel"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        placeholder="+84 9xx xxx xxx"
-                        className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
-                      />
-                    </label>
-
-                    <label className="block space-y-1.5">
-                      <div className="text-[11px] font-medium tracking-wide text-slate-300 uppercase">
-                        Tiểu sử
-                      </div>
-                      <textarea
-                        name="bio"
-                        value={formData.bio}
-                        onChange={handleInputChange}
-                        placeholder="Viết gì đó về bạn..."
-                        className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/70"
-                        rows={3}
-                      />
-                    </label>
-
-                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                      <Button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="flex-1 h-9 rounded-xl font-medium bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
-                      >
-                        {saving ? "Đang lưu..." : "Lưu thay đổi"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => {
-                          setIsEditing(false);
-                          setFormData({
-                            name: profile?.name || "",
-                            email: profile?.email || "",
-                            phone: (profile as any)?.phone || "",
-                            bio: (profile as any)?.bio || "",
-                          });
-                        }}
-                        className="flex-1 h-9 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 text-sm"
-                      >
-                        Hủy
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  // VIEW MODE
-                  <div className="space-y-3 text-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-0.5">
-                        <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-                          Tên
-                        </div>
-                        <div className="text-sm font-semibold text-slate-50">
-                          {displayProfile.name}
-                        </div>
-                      </div>
-
-                      {displayProfile.email && (
-                        <div className="space-y-0.5">
-                          <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-                            Email
+                    <div className="flex-1 pl-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-50">
+                            {displayProfile.name}
                           </div>
-                          <div className="text-sm text-slate-200">
+                          <div className="mt-0.5 text-xs text-slate-400">
                             {displayProfile.email}
                           </div>
                         </div>
-                      )}
-
-                      {displayProfile.gender && (
-                        <div className="space-y-0.5">
-                          <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-                            Giới tính
-                          </div>
-                          <div className="text-sm text-slate-200">
-                            {displayProfile.gender}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {(displayProfile.age ||
-                      displayProfile.height ||
-                      displayProfile.weight) && (
-                      <div className="grid grid-cols-3 gap-2">
-                        {displayProfile.age && (
-                          <div className="space-y-0.5">
-                            <div className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
-                              Tuổi
-                            </div>
-                            <div className="text-sm text-slate-200">
-                              {displayProfile.age}
-                            </div>
-                          </div>
-                        )}
-                        {displayProfile.height && (
-                          <div className="space-y-0.5">
-                            <div className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
-                              Chiều cao
-                            </div>
-                            <div className="text-sm text-slate-200">
-                              {displayProfile.height} cm
-                            </div>
-                          </div>
-                        )}
-                        {displayProfile.weight && (
-                          <div className="space-y-0.5">
-                            <div className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
-                              Cân nặng
-                            </div>
-                            <div className="text-sm text-slate-200">
-                              {displayProfile.weight} kg
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {bmiValue !== null && (
-                      <div className="rounded-2xl border border-sky-500/30 bg-sky-500/5 px-3 py-2.5 flex flex-col gap-1">
-                        <div className="text-[11px] font-semibold tracking-wide text-slate-200 uppercase">
-                          BMI hiện tại
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-2xl font-bold text-sky-300 tabular-nums">
-                            {bmiValue.toFixed(1)}
-                          </div>
-                          <div className="text-sm text-slate-100">
-                            {bmiCategory || "Chưa phân loại"}
-                          </div>
-                        </div>
-                        <p className="text-[11px] text-slate-400">
-                          Dựa trên cân nặng và chiều cao đã cập nhật từ hồ sơ.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 px-3.5 py-3 space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="text-[11px] font-semibold tracking-wide text-slate-200 uppercase">
-                            Cân bằng calories
-                          </div>
-                          <p className="text-[11px] text-slate-400">
-                            {balanceDateLabel}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {balanceStatusStyle && dailySummary?.trang_thai_calo && (
-                            <span
-                              className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${balanceStatusStyle.badge}`}
-                            >
-                              {dailySummary.trang_thai_calo}
-                            </span>
-                          )}
+                        {!isEditing && (
                           <Button
                             type="button"
-                            onClick={() => fetchDailySummary()}
-                            disabled={summaryLoading}
-                            className="h-7 rounded-lg px-2.5 text-[11px] font-medium bg-violet-500/80 hover:bg-violet-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                            onClick={() => setIsEditing(true)}
+                            className="h-8 rounded-xl px-3 text-xs font-medium bg-sky-500 hover:bg-sky-400"
+                            disabled={fetching}
                           >
-                            {summaryLoading ? "Đang tải..." : "Làm mới"}
+                            {fetching ? "Đang tải..." : "Chỉnh sửa"}
                           </Button>
-                        </div>
+                        )}
                       </div>
 
-                      {summaryError && (
-                        <p className="text-[11px] text-amber-200">
-                          {summaryError}
-                        </p>
-                      )}
+                      <div className="mt-2 rounded-xl border border-sky-500/30 bg-sky-500/10 px-2.5 py-1.5">
+                        <div className="text-[10px] font-medium uppercase text-slate-200 tracking-wide">
+                          Mục tiêu
+                        </div>
+                        <div className="mt-0.5 text-xs font-semibold text-sky-200 capitalize line-clamp-1">
+                          {goalText}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                      {!summaryError && summaryLoading && !dailySummary ? (
-                        <div className="h-20 rounded-2xl bg-slate-800/70 animate-pulse" />
-                      ) : consumedCalories === null ? (
-                        <p className="text-[12px] text-slate-300">
-                          Chưa có dữ liệu calories cho ngày hôm nay. Thêm bữa ăn
-                          để thấy cân bằng năng lượng.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-slate-50">
-                            <div className="space-y-0.5">
-                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                Nạp hôm nay
-                              </p>
-                              <p className="text-lg font-semibold text-emerald-200">
-                                {consumedCalories} kcal
-                              </p>
+                  {/* Info */}
+                  {isEditing ? (
+                    // EDIT MODE
+                    <div className="space-y-2">
+                      <label className="block space-y-1.5">
+                        <div className="text-[11px] font-medium tracking-wide text-slate-300 uppercase">
+                          Tên
+                        </div>
+                        <Input
+                          name="name"
+                          value={formData.name}
+                          onChange={handleInputChange}
+                          placeholder="Tên của bạn"
+                          className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
+                        />
+                      </label>
+
+                      <label className="block space-y-1.5">
+                        <div className="text-[11px] font-medium tracking-wide text-slate-300 uppercase">
+                          Email
+                        </div>
+                        <Input
+                          name="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          placeholder="email@example.com"
+                          className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
+                        />
+                      </label>
+
+                      <label className="block space-y-1.5">
+                        <div className="text-[11px] font-medium tracking-wide text-slate-300 uppercase">
+                          Số điện thoại
+                        </div>
+                        <Input
+                          name="phone"
+                          type="tel"
+                          value={formData.phone}
+                          onChange={handleInputChange}
+                          placeholder="+84 9xx xxx xxx"
+                          className="h-9 rounded-xl bg-slate-900 border-slate-700 text-sm text-slate-50 placeholder:text-slate-500"
+                        />
+                      </label>
+
+                      <label className="block space-y-1.5">
+                        <div className="text-[11px] font-medium tracking-wide text-slate-300 uppercase">
+                          Tiểu sử
+                        </div>
+                        <textarea
+                          name="bio"
+                          value={formData.bio}
+                          onChange={handleInputChange}
+                          placeholder="Viết gì đó về bạn..."
+                          className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/70"
+                          rows={3}
+                        />
+                      </label>
+
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                        <Button
+                          type="button"
+                          onClick={handleSave}
+                          disabled={saving}
+                          className="flex-1 h-9 rounded-xl font-medium bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                        >
+                          {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            setIsEditing(false);
+                            setFormData({
+                              name: profile?.name || "",
+                              email: profile?.email || "",
+                              phone: (profile as any)?.phone || "",
+                              bio: (profile as any)?.bio || "",
+                            });
+                          }}
+                          className="flex-1 h-9 rounded-xl border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 text-sm"
+                        >
+                          Hủy
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    // VIEW MODE
+                    <div className="space-y-4 text-sm">
+                      {/* Hàng thông tin cơ bản */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-0.5">
+                          <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                            Tên
+                          </div>
+                          <div className="text-sm font-semibold text-slate-50">
+                            {displayProfile.name}
+                          </div>
+                        </div>
+
+                        {displayProfile.email && (
+                          <div className="space-y-0.5">
+                            <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                              Email
                             </div>
-                            <div className="space-y-0.5">
-                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                Mục tiêu
-                              </p>
-                              <p className="text-lg font-semibold text-slate-200">
-                                {targetCalories !== null
-                                  ? `${targetCalories} kcal`
-                                  : "Chưa cài đặt"}
-                              </p>
-                            </div>
-                            <div className="space-y-0.5">
-                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                Balance
-                              </p>
-                              <p
-                                className={`text-lg font-semibold ${
-                                  balanceValue !== null && balanceValue > 0
-                                    ? "text-amber-200"
-                                    : balanceValue !== null && balanceValue < 0
-                                    ? "text-emerald-200"
-                                    : "text-slate-200"
-                                }`}
-                              >
-                                {formattedBalance || "—"}
-                              </p>
+                            <div className="text-sm text-slate-200">
+                              {displayProfile.email}
                             </div>
                           </div>
-                          {summaryPercent !== null && (
-                            <div className="text-[11px] space-y-1">
-                              <div className="flex items-center justify-between text-slate-400">
-                                <span>Tiến độ {summaryPercent}%</span>
-                                {formattedBalance && (
-                                  <span
-                                    className={
-                                      balanceStatusStyle?.text ||
-                                      "text-slate-200"
-                                    }
-                                  >
-                                    {formattedBalance}
-                                  </span>
-                                )}
+                        )}
+
+                        {displayProfile.gender && (
+                          <div className="space-y-0.5">
+                            <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                              Giới tính
+                            </div>
+                            <div className="text-sm text-slate-200">
+                              {displayProfile.gender}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tuổi / cao / nặng */}
+                      {(displayProfile.age ||
+                        displayProfile.height ||
+                        displayProfile.weight) && (
+                        <div className="grid grid-cols-3 gap-2">
+                          {displayProfile.age && (
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+                                Tuổi
                               </div>
-                              <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-                                <div
-                                  className={`h-full ${balanceProgressColor}`}
-                                  style={{
-                                    width: `${Math.min(summaryPercent, 160)}%`,
-                                  }}
-                                />
+                              <div className="text-sm text-slate-200">
+                                {displayProfile.age}
                               </div>
                             </div>
                           )}
-                        </>
-                      )}
-                    </div>
-
-                    {(displayProfile as any).bio && (
-                      <div className="space-y-0.5">
-                        <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-                          Tiểu sử
+                          {displayProfile.height && (
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+                                Chiều cao
+                              </div>
+                              <div className="text-sm text-slate-200">
+                                {displayProfile.height} cm
+                              </div>
+                            </div>
+                          )}
+                          {displayProfile.weight && (
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">
+                                Cân nặng
+                              </div>
+                              <div className="text-sm text-slate-200">
+                                {displayProfile.weight} kg
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <div className="text-sm text-slate-200 whitespace-pre-wrap">
-                          {(displayProfile as any).bio}
+                      )}
+
+                      {/* BMI & Calories: 2 cột trong card giữa */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {/* BMI */}
+                        {bmiValue !== null && (
+                          <div className="rounded-2xl border border-sky-500/30 bg-sky-500/5 px-3 py-2.5 flex flex-col gap-1 h-full">
+                            <div className="text-[11px] font-semibold tracking-wide text-slate-200 uppercase">
+                              BMI hiện tại
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-2xl font-bold text-sky-300 tabular-nums">
+                                {bmiValue.toFixed(1)}
+                              </div>
+                              <div className="text-sm text-slate-100">
+                                {bmiCategory || "Chưa phân loại"}
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              Dựa trên cân nặng và chiều cao đã cập nhật từ hồ
+                              sơ.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Calories */}
+                        <div className="rounded-2xl border border-violet-500/30 bg-violet-500/5 px-3.5 py-3 space-y-3 h-full">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div className="text-[11px] font-semibold tracking-wide text-slate-200 uppercase">
+                                Cân bằng calories
+                              </div>
+                              <p className="text-[11px] text-slate-400">
+                                {balanceDateLabel}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {balanceStatusStyle &&
+                                dailySummary?.trang_thai_calo && (
+                                  <span
+                                    className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${balanceStatusStyle.badge}`}
+                                  >
+                                    {dailySummary.trang_thai_calo}
+                                  </span>
+                                )}
+                              <Button
+                                type="button"
+                                onClick={() => fetchDailySummary()}
+                                disabled={summaryLoading}
+                                className="h-7 rounded-lg px-2.5 text-[11px] font-medium bg-violet-500/80 hover:bg-violet-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                {summaryLoading ? "Đang tải..." : "Làm mới"}
+                              </Button>
+                            </div>
+                          </div>
+
+                          {summaryError && (
+                            <p className="text-[11px] text-amber-200">
+                              {summaryError}
+                            </p>
+                          )}
+
+                          {!summaryError && summaryLoading && !dailySummary ? (
+                            <div className="h-20 rounded-2xl bg-slate-800/70 animate-pulse" />
+                          ) : consumedCalories === null ? (
+                            <p className="text-[12px] text-slate-300">
+                              Chưa có dữ liệu calories cho ngày hôm nay. Thêm
+                              bữa ăn để thấy cân bằng năng lượng.
+                            </p>
+                          ) : (
+                            <>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-slate-50">
+                                <div className="space-y-0.5">
+                                  <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                                    Nạp hôm nay
+                                  </p>
+                                  <p className="text-lg font-semibold text-emerald-200">
+                                    {consumedCalories} kcal
+                                  </p>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                                    Mục tiêu
+                                  </p>
+                                  <p className="text-lg font-semibold text-slate-200">
+                                    {targetCalories !== null
+                                      ? `${targetCalories} kcal`
+                                      : "Chưa cài đặt"}
+                                  </p>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                                    Balance
+                                  </p>
+                                  <p
+                                    className={`text-lg font-semibold ${
+                                      balanceValue !== null &&
+                                      balanceValue > 0
+                                        ? "text-amber-200"
+                                        : balanceValue !== null &&
+                                          balanceValue < 0
+                                        ? "text-emerald-200"
+                                        : "text-slate-200"
+                                    }`}
+                                  >
+                                    {formattedBalance || "—"}
+                                  </p>
+                                </div>
+                              </div>
+                              {summaryPercent !== null && (
+                                <div className="text-[11px] space-y-1">
+                                  <div className="flex items-center justify-between text-slate-400">
+                                    <span>Tiến độ {summaryPercent}%</span>
+                                    {formattedBalance && (
+                                      <span
+                                        className={
+                                          balanceStatusStyle?.text ||
+                                          "text-slate-200"
+                                        }
+                                      >
+                                        {formattedBalance}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                                    <div
+                                      className={`h-full ${balanceProgressColor}`}
+                                      style={{
+                                        width: `${Math.min(
+                                          summaryPercent,
+                                          160
+                                        )}%`,
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
+
+                      {(displayProfile as any).bio && (
+                        <div className="space-y-0.5">
+                          <div className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                            Tiểu sử
+                          </div>
+                          <div className="text-sm text-slate-200 whitespace-pre-wrap">
+                            {(displayProfile as any).bio}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Hai nút <|  |> ôm sát hồ sơ */}
+                <button
+                  type="button"
+                  onClick={() => setShowGoals((v) => !v)}
+                  className="hidden md:flex items-center justify-center h-11 w-10 rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 text-sm absolute -left-5 top-1/2 -translate-y-1/2 shadow-md shadow-black/40"
+                  title="Ẩn/hiện mục tiêu bên trái"
+                >
+                  {"<|"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWalletPanel((v) => !v)}
+                  className="hidden md:flex items-center justify-center h-11 w-10 rounded-full border border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800 text-sm absolute -right-5 top-1/2 -translate-y-1/2 shadow-md shadow-black/40"
+                  title="Ẩn/hiện Ví FitFood bên phải"
+                >
+                  {"|>"}
+                </button>
               </div>
+
+              {/* RIGHT panel: Ví FitFood */}
+              {showWalletPanel && (
+                <div className="w-full md:w-72 rounded-2xl border border-amber-500/30 bg-amber-500/5 px-3.5 py-3 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[11px] font-semibold tracking-wide text-slate-200 uppercase">
+                        Ví FitFood
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        {walletLastUpdatedLabel
+                          ? `Cập nhật ${walletLastUpdatedLabel}`
+                          : "Demo balance"}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={fetchWalletBalance}
+                      disabled={walletLoading}
+                      className="h-7 rounded-lg px-2.5 text-[11px] font-medium bg-amber-500/80 hover:bg-amber-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {walletLoading ? "Đang tải..." : "Làm mới"}
+                    </Button>
+                  </div>
+                  {walletError && (
+                    <p className="text-[11px] text-amber-200">
+                      {walletError}
+                    </p>
+                  )}
+                  {!walletError && walletLoading && !walletBalance ? (
+                    <div className="h-16 rounded-2xl bg-slate-800/70 animate-pulse" />
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 text-sm">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                          Số dư hiện tại
+                        </p>
+                        <p className="text-2xl font-bold text-amber-200 tabular-nums">
+                          {walletFormattedAmount || "--"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                          Trạng thái
+                        </p>
+                        <p className="text-sm text-slate-200">
+                          {walletBalance
+                            ? "Sẵn sàng sử dụng"
+                            : "Chưa có dữ liệu"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

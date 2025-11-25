@@ -218,6 +218,15 @@ services:
     networks:
       - backend
 
+  payment-service:
+    build: ./payment-service
+    expose:
+      - "3008"
+    environment:
+      PORT: 3008
+    networks:
+      - backend
+
   analytics-service:
     build: ./analytics-service
     expose:
